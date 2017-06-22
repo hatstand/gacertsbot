@@ -1,0 +1,8 @@
+project {
+  project_id: "foo"
+  domain: "foo.org"
+}
+project {
+  project_id: "bar"
+  domain: "bar.com"
+}

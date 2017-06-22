@@ -1,0 +1,12 @@
+syntax="proto2";
+
+package proto;
+
+message Config {
+  message Project {
+    optional string project_id = 1;
+    repeated string domain = 2;
+  }
+
+  repeated Project project = 1;
+}
