@@ -1,10 +1,14 @@
 package main
 
 import (
+	"crypto/x509"
 	"encoding/pem"
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"log"
+	"strings"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 	pb "github.com/hatstand/gacertsbot/proto"
@@ -20,6 +24,25 @@ func extractBlocks(data []byte) []*pem.Block {
 		return []*pem.Block{}
 	}
 	return append(extractBlocks(rest), block)
+}
+
+func extractExpiry(chain []byte, domain string) (time.Time, error) {
+	blocks := extractBlocks(chain)
+	for _, block := range blocks {
+		certs, err := x509.ParseCertificates(block.Bytes)
+		if err != nil {
+			return time.Unix(0, 0), fmt.Errorf("Failed to parse certificates: %v", err)
+		}
+
+		for _, cert := range certs {
+			for _, name := range cert.DNSNames {
+				if strings.Contains(name, domain) {
+					return cert.NotAfter, nil
+				}
+			}
+		}
+	}
+	return time.Unix(0, 0), fmt.Errorf("Could not find domain %s in certificates", domain)
 }
 
 func main() {
