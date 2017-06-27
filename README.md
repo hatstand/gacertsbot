@@ -9,7 +9,7 @@ go run cmd/gacertsbot/main.go -config config.txt -fullchain fullchain.pem -key p
 
 `config.txt` should be a [Config proto](proto/config.proto) in text format.
 `fullchain.pem` should be the public keys for your certificate in PEM format including any required certificates in the root chain.
-`privatekey.pem` should be a private key file in PEM PKCS8 format, i.e. it should begin with something like === BEGIN PRIVATE KEY ===.
+`privatekey.pem` should be a private key file in PEM PKCS8 format, i.e. it should begin with something like `=== BEGIN PRIVATE KEY ===`.
 
 ## Credentials
 
