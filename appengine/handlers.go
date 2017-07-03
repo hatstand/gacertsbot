@@ -48,6 +48,7 @@ func getOrCreateKey(c context.Context) (*rsa.PrivateKey, error) {
 		if err != nil {
 			return nil, fmt.Errorf("Failed to generate ACME RSA private key: %v", err)
 		}
+		// TODO: Register this key with LetsEncrypt here.
 		err = memcache.Add(c, &memcache.Item{
 			Key:   ACMEKey,
 			Value: serializeKey(key),
@@ -83,7 +84,7 @@ func handleStartAuthorise(w http.ResponseWriter, r *http.Request) {
 
 	for _, challenge := range auth.Challenges {
 		if challenge.Type == "http-01" {
-			log.Println("Received http challenge")
+			log.Println("Received http challenge: ", challenge)
 			memcache.Add(c, &memcache.Item{
 				Key:   ACMEToken,
 				Value: []byte(challenge.Token),
