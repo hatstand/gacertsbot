@@ -6,12 +6,12 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 
 	"golang.org/x/crypto/acme"
 	"golang.org/x/net/context"
 	"google.golang.org/appengine"
+	"google.golang.org/appengine/log"
 	"google.golang.org/appengine/memcache"
 	"google.golang.org/appengine/urlfetch"
 )
@@ -77,14 +77,14 @@ func handleStartAuthorise(w http.ResponseWriter, r *http.Request) {
 
 	auth, err := client.Authorize(c, "test.clementine-player.org")
 	if err != nil {
-		log.Print("Failed to authorize client: ", err)
+		log.Errorf(c, "Failed to authorize client: %v", err)
 		http.Error(w, "Failed to authorize client", 500)
 		return
 	}
 
 	for _, challenge := range auth.Challenges {
 		if challenge.Type == "http-01" {
-			log.Println("Received http challenge: ", challenge)
+			log.Infof(c, "Received http challenge: %v", challenge)
 			memcache.Add(c, &memcache.Item{
 				Key:   ACMEToken,
 				Value: []byte(challenge.Token),
@@ -170,7 +170,7 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 
 	account, err := client.Register(c, accountInfo, acme.AcceptTOS)
 	if err != nil {
-		log.Print("Failed to register: ", err)
+		log.Errorf(c, "Failed to register: %v", err)
 		http.Error(w, "Failed to register", 500)
 		return
 	}
