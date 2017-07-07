@@ -25,9 +25,21 @@ const (
 )
 
 func init() {
-	http.HandleFunc("/auth", handleStartAuthorise)
-	http.HandleFunc("/register", handleRegister)
-	http.HandleFunc("/.well-known", handleChallenge)
+	http.HandleFunc("/auth", wrapHTTPHandler(handleStartAuthorise))
+	http.HandleFunc("/register", wrapHTTPHandler(handleRegister))
+	http.HandleFunc("/.well-known", wrapHTTPHandler(handleChallenge))
+}
+
+type HandlerFunc func(context.Context, http.ResponseWriter, *http.Request) error
+
+func wrapHTTPHandler(h HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		c := appengine.NewContext(r)
+		if err := h(c, w, r); err != nil {
+			log.Errorf(c, "%v", err)
+			http.Error(w, "%v", 500)
+		}
+	}
 }
 
 func serializeKey(key *rsa.PrivateKey) []byte {
@@ -64,20 +76,27 @@ func getOrCreateKey(c context.Context) (*rsa.PrivateKey, error) {
 	return key, nil
 }
 
-func handleStartAuthorise(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
+func createACMEClient(c context.Context) (*acme.Client, error) {
 	key, err := getOrCreateKey(c)
-	client := &acme.Client{
+	if err != nil {
+		return nil, err
+	}
+	return &acme.Client{
 		Key:          key,
 		HTTPClient:   urlfetch.Client(c),
 		DirectoryURL: LETS_ENCRYPT_STAGING,
+	}, err
+}
+
+func handleStartAuthorise(c context.Context, w http.ResponseWriter, r *http.Request) error {
+	client, err := createACMEClient(c)
+	if err != nil {
+		return fmt.Errorf("Failed to create ACME client: %v", err)
 	}
 
 	auth, err := client.Authorize(c, r.URL.Host)
 	if err != nil {
-		log.Errorf(c, "Failed to authorize client: %v", err)
-		http.Error(w, "Failed to authorize client", 500)
-		return
+		return fmt.Errorf("Failed to authorize client: %v", err)
 	}
 
 	for _, challenge := range auth.Challenges {
@@ -94,84 +113,66 @@ func handleStartAuthorise(w http.ResponseWriter, r *http.Request) {
 			// TODO: Accept the HTTP-01 challenge
 		}
 	}
+	return nil
 }
 
-func handleChallenge(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
+func handleChallenge(c context.Context, w http.ResponseWriter, r *http.Request) error {
 	item, err := memcache.Get(c, "ACME_TOKEN")
 	if err != nil {
 		http.Error(w, "No ACME challenge in progress", 400)
-		return
+		return nil
 	}
 
-	key, err := getOrCreateKey(c)
+	client, err := createACMEClient(c)
 	if err != nil {
-		http.Error(w, "Could not get key", 500)
-		return
+		return fmt.Errorf("Failed to create ACME client: %v", err)
 	}
 
-	client := &acme.Client{
-		Key:        key,
-		HTTPClient: urlfetch.Client(c),
-	}
 	response, err := client.HTTP01ChallengeResponse(string(item.Value))
 	if err != nil {
-		http.Error(w, "Could not construct HTTP-01 challenge response", 500)
-		return
+		return fmt.Errorf("Could not construct HTTP-01 challenge response: %v", err)
 	}
 
 	io.WriteString(w, response)
+	return nil
 }
 
-func handleCheckStatus(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-	key, err := getOrCreateKey(c)
-	if err != nil {
-		http.Error(w, "Could not get key", 500)
-		return
-	}
-
+func handleCheckStatus(c context.Context, w http.ResponseWriter, r *http.Request) error {
 	item, err := memcache.Get(c, ACMEURI)
 	if err != nil {
 		http.Error(w, "No ACME authorisation in progress", 400)
-		return
+		return nil
 	}
 
-	client := &acme.Client{
-		Key:        key,
-		HTTPClient: urlfetch.Client(c),
+	client, err := createACMEClient(c)
+	if err != nil {
+		return fmt.Errorf("Failed to create ACME client: %v", err)
 	}
+
 	auth, err := client.GetAuthorization(c, string(item.Value))
 	if err != nil {
-		http.Error(w, "Could not get current ACME authorization", 500)
-		return
+		return fmt.Errorf("Could not get current ACME authorization: %v", err)
 	}
 
 	io.WriteString(w, "Current status: "+auth.Status)
+	return nil
 }
 
-func handleRegister(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-	key, err := getOrCreateKey(c)
+func handleRegister(c context.Context, w http.ResponseWriter, r *http.Request) error {
+	client, err := createACMEClient(c)
 	if err != nil {
-		http.Error(w, "Could not get key", 500)
-		return
+		return fmt.Errorf("Failed to create ACME client: %v", err)
 	}
 
-	client := &acme.Client{
-		Key:        key,
-		HTTPClient: urlfetch.Client(c),
-	}
 	accountInfo := &acme.Account{
 		Contact: []string{"mailto:john.maguire@gmail.com"},
 	}
 
 	account, err := client.Register(c, accountInfo, acme.AcceptTOS)
 	if err != nil {
-		log.Errorf(c, "Failed to register: %v", err)
-		http.Error(w, "Failed to register", 500)
-		return
+		return fmt.Errorf("Failed to register: %v", err)
 	}
 
 	io.WriteString(w, fmt.Sprintf("%v", account))
+	return nil
 }
