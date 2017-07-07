@@ -4,14 +4,33 @@ import (
 	"time"
 
 	"golang.org/x/net/context"
+	"golang.org/x/oauth2"
 	"google.golang.org/appengine/datastore"
 )
 
 const (
 	challengeKind           = "SSLCertificates-Challenge"
 	registeredAccountKind   = "SSLCertificates-RegisteredAccount"
+	adminCredentialsKind    = "SSLCertificates-AdminCredentials"
 	registeredAccountIDName = "account"
+	adminCredentialsIDName  = "credentials"
 )
+
+type AdminCredentials struct {
+	State string
+	Token oauth2.Token
+}
+
+func (a *AdminCredentials) Put(c context.Context) error {
+	_, err := datastore.Put(c, datastore.NewKey(c, adminCredentialsKind, adminCredentialsIDName, 0, nil), a)
+	return err
+}
+
+func GetAdminCredentials(c context.Context) (*AdminCredentials, error) {
+	var ret AdminCredentials
+	err := datastore.Get(c, datastore.NewKey(c, adminCredentialsKind, adminCredentialsIDName, 0, nil), &ret)
+	return &ret, err
+}
 
 type RegisteredAccount struct {
 	Created    time.Time
@@ -34,20 +53,13 @@ type Challenge struct {
 	Error string
 }
 
-func (ch *Challenge) Key(c context.Context) *datastore.Key {
-	return datastore.NewKey(c, challengeKind, ch.Token, 0, nil)
-}
-
 func (ch *Challenge) Put(c context.Context) error {
-	_, err := datastore.Put(c, ch.Key(c), ch)
+	_, err := datastore.Put(c, datastore.NewKey(c, challengeKind, ch.Token, 0, nil), ch)
 	return err
 }
 
 func GetChallenge(c context.Context, token string) (*Challenge, error) {
-	key := datastore.NewKey(c, challengeKind, token, 0, nil)
 	var ret Challenge
-	if err := datastore.Get(c, key, &ret); err != nil {
-		return nil, err
-	}
-	return &ret, nil
+	err := datastore.Get(c, datastore.NewKey(c, challengeKind, token, 0, nil), &ret)
+	return &ret, err
 }

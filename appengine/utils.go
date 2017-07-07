@@ -2,6 +2,7 @@ package appengine
 
 import (
 	"fmt"
+	"math/rand"
 	"net/http"
 	"time"
 
@@ -34,7 +35,6 @@ func delayFunc(c context.Context, fn *delay.Function, args ...interface{}) error
 		MinBackoff: 5 * time.Second,
 		MaxBackoff: 30 * time.Second,
 	}
-	task.Delay = 5 * time.Second
 
 	// Schedule the task.
 	task, err = taskqueue.Add(c, task, "")
@@ -58,4 +58,13 @@ func wrapHTTPHandler(h HandlerFunc) http.HandlerFunc {
 			http.Error(w, err.Error(), 500)
 		}
 	}
+}
+
+func randomString(n int) string {
+	letters := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
 }

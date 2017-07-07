@@ -1,9 +1,11 @@
 package appengine
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"time"
 
@@ -17,6 +19,9 @@ import (
 
 const (
 	letsEncryptStagingURL = "https://acme-staging.api.letsencrypt.org/directory"
+
+	privateKeyPEMType  = "RSA PRIVATE KEY"
+	certificatePEMType = "CERTIFICATE"
 )
 
 func createACMEClient(c context.Context) (*acme.Client, error) {
@@ -79,4 +84,14 @@ func deserializeKey(key []byte) *rsa.PrivateKey {
 		panic(err)
 	}
 	return ret
+}
+
+func pemEncode(typ string, items [][]byte) ([]byte, error) {
+	var buf bytes.Buffer
+	for _, der := range items {
+		if err := pem.Encode(&buf, &pem.Block{Type: typ, Bytes: der}); err != nil {
+			return nil, err
+		}
+	}
+	return buf.Bytes(), nil
 }

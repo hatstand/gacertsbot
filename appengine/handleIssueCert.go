@@ -54,22 +54,12 @@ var issueCertificateFunc = delay.Func("issue-certificate", func(c context.Contex
 	}
 
 	// Try to issue a certificate with it.
-	ders, url, err := client.CreateCert(c, csr, 90*24*time.Hour, true)
+	chain, url, err := client.CreateCert(c, csr, 90*24*time.Hour, true)
 	if err != nil {
 		return fmt.Errorf("Failed to create certificate: %v", err)
 	}
-	log.Infof(c, "Got %d DER blocks for certificate %s", len(ders), url)
+	log.Infof(c, "Got %d DER blocks for certificate %s", len(chain), url)
 
-	for _, der := range ders {
-		certs, err := x509.ParseCertificates(der)
-		if err != nil {
-			return fmt.Errorf("Failed to parse certificate: %v", err)
-		}
-
-		for _, cert := range certs {
-			log.Infof(c, "Got cert %s: CN=%s Issuer=%s",
-				cert.SerialNumber, cert.Subject.CommonName, cert.Issuer.CommonName)
-		}
-	}
-	return nil
+	// Upload it to the cloud console.
+	return delayFunc(c, uploadCertFunc, serializeKey(certKey), chain)
 })
