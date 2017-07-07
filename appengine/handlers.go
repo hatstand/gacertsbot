@@ -25,14 +25,9 @@ const (
 )
 
 func init() {
-	http.HandleFunc("/", handler)
 	http.HandleFunc("/auth", handleStartAuthorise)
 	http.HandleFunc("/register", handleRegister)
 	http.HandleFunc("/.well-known", handleChallenge)
-}
-
-func handler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprint(w, "Hello, World!")
 }
 
 func serializeKey(key *rsa.PrivateKey) []byte {
