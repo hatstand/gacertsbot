@@ -1,10 +1,10 @@
 runtime: go
 api_version: go1.8
-module: acme
-version: latest
+module: ssl-certificates
+version: live
 
 handlers:
-- url: /auth
+- url: /ssl-certificates/.*
   login: admin
   script: _go_app
 
