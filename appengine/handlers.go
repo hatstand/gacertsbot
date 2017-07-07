@@ -20,6 +20,8 @@ const (
 	ACMEToken = "ACME_TOKEN"
 	ACMEKey   = "ACME_KEY"
 	ACMEURI   = "ACME_URI"
+
+	LETS_ENCRYPT_STAGING = "https://acme-staging.api.letsencrypt.org/directory"
 )
 
 func init() {
@@ -71,8 +73,9 @@ func handleStartAuthorise(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	key, err := getOrCreateKey(c)
 	client := &acme.Client{
-		Key:        key,
-		HTTPClient: urlfetch.Client(c),
+		Key:          key,
+		HTTPClient:   urlfetch.Client(c),
+		DirectoryURL: LETS_ENCRYPT_STAGING,
 	}
 
 	auth, err := client.Authorize(c, "test.clementine-player.org")
