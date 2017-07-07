@@ -57,7 +57,7 @@ var uploadCertFunc = delay.Func("upload-certificate", func(c context.Context, ke
 	if err != nil {
 		return fmt.Errorf("Failed to upload certificate: %v", err)
 	}
-
 	log.Infof(c, "Successfully uploaded %s", resp.Name)
-	return nil
+
+	return delayFunc(c, mapCertFunc, resp.Id, certs[0].Subject.CommonName)
 })
