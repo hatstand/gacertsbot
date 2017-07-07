@@ -47,9 +47,8 @@ func createACMEClient(c context.Context) (*acme.Client, error) {
 	}
 
 	client := &acme.Client{
-		Key:          deserializeKey(account.PrivateKey),
-		HTTPClient:   urlfetch.Client(c),
-		DirectoryURL: letsEncryptStagingURL,
+		Key:        deserializeKey(account.PrivateKey),
+		HTTPClient: urlfetch.Client(c),
 	}
 
 	if account.AccountID == "" {
