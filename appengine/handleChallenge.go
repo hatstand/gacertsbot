@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"golang.org/x/net/context"
-	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/log"
 )
 
@@ -16,9 +15,8 @@ func handleChallenge(c context.Context, w http.ResponseWriter, r *http.Request) 
 	token := strings.TrimPrefix(r.URL.Path, challengePathPrefix)
 
 	// Find the challenge in datastore.
-	entityKey := datastore.NewKey(c, challengeKind, token, 0, nil)
-	var challenge Challenge
-	if err := datastore.Get(c, entityKey, &challenge); err != nil {
+	challenge, err := GetChallenge(c, token)
+	if err != nil {
 		return err
 	}
 

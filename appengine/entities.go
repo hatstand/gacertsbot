@@ -42,3 +42,12 @@ func (ch *Challenge) Put(c context.Context) error {
 	_, err := datastore.Put(c, ch.Key(c), ch)
 	return err
 }
+
+func GetChallenge(c context.Context, token string) (*Challenge, error) {
+	key := datastore.NewKey(c, challengeKind, token, 0, nil)
+	var ret Challenge
+	if err := datastore.Get(c, key, &ret); err != nil {
+		return nil, err
+	}
+	return &ret, nil
+}
