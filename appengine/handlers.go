@@ -73,7 +73,7 @@ func handleStartAuthorise(w http.ResponseWriter, r *http.Request) {
 		DirectoryURL: LETS_ENCRYPT_STAGING,
 	}
 
-	auth, err := client.Authorize(c, "test.clementine-player.org")
+	auth, err := client.Authorize(c, r.URL.Host)
 	if err != nil {
 		log.Errorf(c, "Failed to authorize client: %v", err)
 		http.Error(w, "Failed to authorize client", 500)

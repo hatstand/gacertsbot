@@ -1,5 +1,7 @@
 runtime: go
 api_version: go1.8
+module: acme
+version: latest
 
 handlers:
 - url: /.*
