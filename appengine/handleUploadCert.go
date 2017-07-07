@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"golang.org/x/net/context"
+	"golang.org/x/oauth2/google"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/delay"
 	"google.golang.org/appengine/log"
@@ -14,11 +15,10 @@ import (
 )
 
 var uploadCertFunc = delay.Func("upload-certificate", func(c context.Context, key []byte, chain [][]byte) error {
-	client, err := getAuthenticatedClient(c)
+	client, err := google.DefaultClient(c, aeapi.CloudPlatformScope)
 	if err != nil {
-		return fmt.Errorf("Failed to create authenticated HTTP client: %v", err)
+		return fmt.Errorf("Failed to create client: %v", err)
 	}
-
 	apps, err := aeapi.New(client)
 	if err != nil {
 		return fmt.Errorf("Failed to create appengine client: %v", err)
@@ -58,6 +58,6 @@ var uploadCertFunc = delay.Func("upload-certificate", func(c context.Context, ke
 		return fmt.Errorf("Failed to upload certificate: %v", err)
 	}
 
-	log.Infof(c, "Did it work? %v", resp)
+	log.Infof(c, "Successfully uploaded %s", resp.Name)
 	return nil
 })

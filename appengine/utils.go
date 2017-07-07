@@ -2,7 +2,6 @@ package appengine
 
 import (
 	"fmt"
-	"math/rand"
 	"net/http"
 	"time"
 
@@ -58,13 +57,4 @@ func wrapHTTPHandler(h HandlerFunc) http.HandlerFunc {
 			http.Error(w, err.Error(), 500)
 		}
 	}
-}
-
-func randomString(n int) string {
-	letters := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-	b := make([]rune, n)
-	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
-	}
-	return string(b)
 }

@@ -10,13 +10,6 @@ import (
 )
 
 func handleCreate(c context.Context, w http.ResponseWriter, r *http.Request) error {
-	switch ok, err := hasAdminCredentials(c, w, r); {
-	case err != nil:
-		return err
-	case ok == false:
-		return nil
-	}
-
 	client, err := createACMEClient(c)
 	if err != nil {
 		return fmt.Errorf("Failed to create ACME client: %v", err)
