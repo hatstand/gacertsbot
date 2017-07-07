@@ -7,35 +7,46 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
+	"time"
 
 	"golang.org/x/crypto/acme"
 	"golang.org/x/net/context"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/log"
-	"google.golang.org/appengine/memcache"
 	"google.golang.org/appengine/urlfetch"
 	"google.golang.org/appengine/user"
 )
 
 const (
-	ACMEToken = "ACME_TOKEN"
-	ACMEURI   = "ACME_URI"
-
+	challengePathPrefix   = "/.well-known/acme-challenge/"
 	letsEncryptStagingURL = "https://acme-staging.api.letsencrypt.org/directory"
 
 	registeredAccountKind   = "RegisteredAccount"
 	registeredAccountIDName = "account"
+	challengeKind           = "Challenge"
 )
 
 type RegisteredAccount struct {
+	Created    time.Time
 	PrivateKey []byte
 	AccountID  string
 }
 
+type Challenge struct {
+	Type  string
+	URI   string
+	Token string
+
+	Accepted  time.Time
+	Responded time.Time
+	Response  string
+}
+
 func init() {
 	http.HandleFunc("/auth", wrapHTTPHandler(handleStartAuthorise))
-	http.HandleFunc("/.well-known", wrapHTTPHandler(handleChallenge))
+	http.HandleFunc(challengePathPrefix, wrapHTTPHandler(handleChallenge))
 }
 
 type HandlerFunc func(context.Context, http.ResponseWriter, *http.Request) error
@@ -45,7 +56,7 @@ func wrapHTTPHandler(h HandlerFunc) http.HandlerFunc {
 		c := appengine.NewContext(r)
 		if err := h(c, w, r); err != nil {
 			log.Errorf(c, "%v", err)
-			http.Error(w, "%v", 500)
+			http.Error(w, err.Error(), 500)
 		}
 	}
 }
@@ -74,6 +85,7 @@ func createACMEClient(c context.Context) (*acme.Client, error) {
 		if err != nil {
 			return nil, fmt.Errorf("Failed to generate ACME RSA private key: %v", err)
 		}
+		account.Created = time.Now()
 		account.PrivateKey = serializeKey(key)
 
 	case nil:
@@ -117,66 +129,61 @@ func handleStartAuthorise(c context.Context, w http.ResponseWriter, r *http.Requ
 		return fmt.Errorf("Failed to create ACME client: %v", err)
 	}
 
+	log.Infof(c, "Authorizing %s", r.URL.Host)
 	auth, err := client.Authorize(c, r.URL.Host)
 	if err != nil {
 		return fmt.Errorf("Failed to authorize client: %v", err)
 	}
 
 	for _, challenge := range auth.Challenges {
-		if challenge.Type == "http-01" {
-			log.Infof(c, "Received http challenge: %v", challenge)
-			memcache.Add(c, &memcache.Item{
-				Key:   ACMEToken,
-				Value: []byte(challenge.Token),
-			})
-			memcache.Add(c, &memcache.Item{
-				Key:   ACMEURI,
-				Value: []byte(auth.URI),
-			})
-			// TODO: Accept the HTTP-01 challenge
+		if challenge.Type != "http-01" {
+			continue
 		}
+
+		log.Infof(c, "Received http challenge %s, token %s", challenge.URI, challenge.Token)
+
+		// Get a response ready.
+		response, err := client.HTTP01ChallengeResponse(challenge.Token)
+		if err != nil {
+			return fmt.Errorf("Failed to create response to %s: %v", challenge.Token, err)
+		}
+
+		// Accept the challenge.
+		challenge, err := client.Accept(c, challenge)
+		if err != nil {
+			return fmt.Errorf("Failed to accept challenge: %v", err)
+		}
+		log.Infof(c, "Accepted challenge")
+
+		// Record the challenge and response in datastore.
+		if _, err := datastore.Put(c, datastore.NewKey(c, challengeKind, challenge.Token, 0, nil), &Challenge{
+			Type:     challenge.Type,
+			URI:      challenge.URI,
+			Token:    challenge.Token,
+			Accepted: time.Now(),
+			Response: response,
+		}); err != nil {
+			return fmt.Errorf("Failed to save challenge: %v", err)
+		}
+		break
 	}
 	return nil
 }
 
 func handleChallenge(c context.Context, w http.ResponseWriter, r *http.Request) error {
-	item, err := memcache.Get(c, "ACME_TOKEN")
-	if err != nil {
-		http.Error(w, "No ACME challenge in progress", 400)
-		return nil
+	token := strings.TrimPrefix(r.URL.Path, challengePathPrefix)
+
+	// Find the challenge in datastore.
+	entityKey := datastore.NewKey(c, challengeKind, token, 0, nil)
+	challenge := Challenge{}
+	if err := datastore.Get(c, entityKey, &challenge); err != nil {
+		return err
 	}
 
-	client, err := createACMEClient(c)
-	if err != nil {
-		return fmt.Errorf("Failed to create ACME client: %v", err)
-	}
+	log.Infof(c, "Responding to challenge %s with %s", challenge.URI, challenge.Response)
+	io.WriteString(w, challenge.Response)
 
-	response, err := client.HTTP01ChallengeResponse(string(item.Value))
-	if err != nil {
-		return fmt.Errorf("Could not construct HTTP-01 challenge response: %v", err)
-	}
-
-	io.WriteString(w, response)
-	return nil
-}
-
-func handleCheckStatus(c context.Context, w http.ResponseWriter, r *http.Request) error {
-	item, err := memcache.Get(c, ACMEURI)
-	if err != nil {
-		http.Error(w, "No ACME authorisation in progress", 400)
-		return nil
-	}
-
-	client, err := createACMEClient(c)
-	if err != nil {
-		return fmt.Errorf("Failed to create ACME client: %v", err)
-	}
-
-	auth, err := client.GetAuthorization(c, string(item.Value))
-	if err != nil {
-		return fmt.Errorf("Could not get current ACME authorization: %v", err)
-	}
-
-	io.WriteString(w, "Current status: "+auth.Status)
-	return nil
+	challenge.Responded = time.Now()
+	_, err := datastore.Put(c, entityKey, &challenge)
+	return err
 }
