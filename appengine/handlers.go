@@ -11,22 +11,30 @@ import (
 	"golang.org/x/crypto/acme"
 	"golang.org/x/net/context"
 	"google.golang.org/appengine"
+	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/log"
 	"google.golang.org/appengine/memcache"
 	"google.golang.org/appengine/urlfetch"
+	"google.golang.org/appengine/user"
 )
 
 const (
 	ACMEToken = "ACME_TOKEN"
-	ACMEKey   = "ACME_KEY"
 	ACMEURI   = "ACME_URI"
 
-	LETS_ENCRYPT_STAGING = "https://acme-staging.api.letsencrypt.org/directory"
+	letsEncryptStagingURL = "https://acme-staging.api.letsencrypt.org/directory"
+
+	registeredAccountKind   = "RegisteredAccount"
+	registeredAccountIDName = "account"
 )
+
+type RegisteredAccount struct {
+	PrivateKey []byte
+	AccountID  string
+}
 
 func init() {
 	http.HandleFunc("/auth", wrapHTTPHandler(handleStartAuthorise))
-	http.HandleFunc("/register", wrapHTTPHandler(handleRegister))
 	http.HandleFunc("/.well-known", wrapHTTPHandler(handleChallenge))
 }
 
@@ -46,46 +54,61 @@ func serializeKey(key *rsa.PrivateKey) []byte {
 	return x509.MarshalPKCS1PrivateKey(key)
 }
 
-func deserializeKey(key []byte) (*rsa.PrivateKey, error) {
-	return x509.ParsePKCS1PrivateKey(key)
+func deserializeKey(key []byte) *rsa.PrivateKey {
+	ret, err := x509.ParsePKCS1PrivateKey(key)
+	if err != nil {
+		panic(err)
+	}
+	return ret
 }
 
-func getOrCreateKey(c context.Context) (*rsa.PrivateKey, error) {
-	item, err := memcache.Get(c, ACMEKey)
-	if err == memcache.ErrCacheMiss {
+func createACMEClient(c context.Context) (*acme.Client, error) {
+	// Get the account from Datastore.
+	entityKey := datastore.NewKey(c, registeredAccountKind, registeredAccountIDName, 0, nil)
+	account := RegisteredAccount{}
+
+	switch err := datastore.Get(c, entityKey, &account); err {
+	case datastore.ErrNoSuchEntity:
+		log.Infof(c, "Account not found, creating new private key")
 		key, err := rsa.GenerateKey(rand.Reader, 2048)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to generate ACME RSA private key: %v", err)
 		}
-		// TODO: Register this key with LetsEncrypt here.
-		err = memcache.Add(c, &memcache.Item{
-			Key:   ACMEKey,
-			Value: serializeKey(key),
-		})
-		if err != nil {
-			return nil, fmt.Errorf("Failed to store ACME RSA private key: %v", err)
-		}
-		return key, nil
-	} else if err != nil {
-		return nil, fmt.Errorf("Failed to get ACME RSA private key: %v", err)
-	}
-	key, err := deserializeKey(item.Value)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to parse key from memcache: %v", err)
-	}
-	return key, nil
-}
+		account.PrivateKey = serializeKey(key)
 
-func createACMEClient(c context.Context) (*acme.Client, error) {
-	key, err := getOrCreateKey(c)
-	if err != nil {
+	case nil:
+		log.Infof(c, "Using existing account %s", account.AccountID)
+
+	default:
 		return nil, err
 	}
-	return &acme.Client{
-		Key:          key,
+
+	client := &acme.Client{
+		Key:          deserializeKey(account.PrivateKey),
 		HTTPClient:   urlfetch.Client(c),
-		DirectoryURL: LETS_ENCRYPT_STAGING,
-	}, err
+		DirectoryURL: letsEncryptStagingURL,
+	}
+
+	if account.AccountID == "" {
+		// Register with Let's Encrypt.
+		email := user.Current(c).Email
+		log.Infof(c, "Registering new account with email address %s", email)
+		acc, err := client.Register(c, &acme.Account{
+			Contact: []string{fmt.Sprintf("mailto:%s", email)},
+		}, acme.AcceptTOS)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to register: %v", err)
+		}
+
+		// Put it back in datastore.
+		log.Infof(c, "Registered new account %s", acc.URI)
+		account.AccountID = acc.URI
+		if _, err := datastore.Put(c, entityKey, &account); err != nil {
+			return nil, err
+		}
+	}
+
+	return client, nil
 }
 
 func handleStartAuthorise(c context.Context, w http.ResponseWriter, r *http.Request) error {
@@ -155,24 +178,5 @@ func handleCheckStatus(c context.Context, w http.ResponseWriter, r *http.Request
 	}
 
 	io.WriteString(w, "Current status: "+auth.Status)
-	return nil
-}
-
-func handleRegister(c context.Context, w http.ResponseWriter, r *http.Request) error {
-	client, err := createACMEClient(c)
-	if err != nil {
-		return fmt.Errorf("Failed to create ACME client: %v", err)
-	}
-
-	accountInfo := &acme.Account{
-		Contact: []string{"mailto:john.maguire@gmail.com"},
-	}
-
-	account, err := client.Register(c, accountInfo, acme.AcceptTOS)
-	if err != nil {
-		return fmt.Errorf("Failed to register: %v", err)
-	}
-
-	io.WriteString(w, fmt.Sprintf("%v", account))
 	return nil
 }

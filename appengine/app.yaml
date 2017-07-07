@@ -4,5 +4,9 @@ module: acme
 version: latest
 
 handlers:
+- url: /auth
+  login: admin
+  script: _go_app
+
 - url: /.*
   script: _go_app
