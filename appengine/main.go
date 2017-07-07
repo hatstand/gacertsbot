@@ -10,5 +10,6 @@ const (
 
 func init() {
 	http.HandleFunc("/ssl-certificates/create", wrapHTTPHandler(handleCreate))
+	http.HandleFunc("/ssl-certificates/status", wrapHTTPHandler(handleStatus))
 	http.HandleFunc(challengePathPrefix, wrapHTTPHandler(handleChallenge))
 }

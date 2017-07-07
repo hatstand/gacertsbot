@@ -14,12 +14,20 @@ import (
 	aeapi "google.golang.org/api/appengine/v1beta"
 )
 
-var uploadCertFunc = delay.Func("upload-certificate", func(c context.Context, key []byte, chain [][]byte) error {
+func createAppengineClient(c context.Context) (*aeapi.AppsService, error) {
 	client, err := google.DefaultClient(c, aeapi.CloudPlatformScope)
 	if err != nil {
-		return fmt.Errorf("Failed to create client: %v", err)
+		return nil, fmt.Errorf("Failed to create client: %v", err)
 	}
 	apps, err := aeapi.New(client)
+	if err != nil {
+		return nil, err
+	}
+	return apps.Apps, err
+}
+
+var uploadCertFunc = delay.Func("upload-certificate", func(c context.Context, key []byte, chain [][]byte) error {
+	apps, err := createAppengineClient(c)
 	if err != nil {
 		return fmt.Errorf("Failed to create appengine client: %v", err)
 	}
@@ -47,7 +55,7 @@ var uploadCertFunc = delay.Func("upload-certificate", func(c context.Context, ke
 	// Upload the certificate.
 	log.Infof(c, "Uploading certificate %s", displayName)
 	log.Debugf(c, "%s\n%s", keyPEM, certPEM)
-	resp, err := apps.Apps.AuthorizedCertificates.Create(appengine.AppID(c), &aeapi.AuthorizedCertificate{
+	resp, err := apps.AuthorizedCertificates.Create(appengine.AppID(c), &aeapi.AuthorizedCertificate{
 		CertificateRawData: &aeapi.CertificateRawData{
 			PublicCertificate: string(certPEM),
 			PrivateKey:        string(keyPEM),

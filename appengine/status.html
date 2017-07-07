@@ -1,0 +1,53 @@
+<title>{{ project }} - SSL certificates</title>
+
+<style>
+  body, table {
+    font-family: sans-serif;
+    font-size: 10pt;
+  }
+
+  table {
+    border-collapse: collapse;
+    border-spacing: 0;
+  }
+
+  th, td {
+    margin: 0;
+    padding: 2px 6px;
+    border: 1px solid grey;
+  }
+
+  div.secure {
+    background:
+      no-repeat
+      left center
+      url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAALEwAACxMBAJqcGAAAAchJREFUOI2Fk01PE0EYx//PzLp92W5bEcFw8MCBT6DxhNCDF0JAo8SDkqiBq1/GsyZNvEmM8agSAtZwgA/gwQRjYtpa+up2YXd2ZjwY1p0txf/teZnfPP95IYzRh1pthoPfAABLWgcLCzfr5/VROvH+8DCfH4oXSoZP/FAwTYCTzUnG6BWPgueVSuU02W+lATk/fNP3vaVf3Q4ucd5mjHSj3ZqcnriyWXQKUwDuJvtZMvi492VZiGip2TnWxUL+3sbDtclnaw+uuo57v9FuayGi1U+f9++MBXi+t9HotlDIOduPVlbeneUfry6/dbL53XrnGIOhtznWQrPXdaVUsDm20taCKNwSkVgUIiwn8/Eh9mrF6s7P9XVfX6M5dxdzpQMD8LV3C9+8eThU14szr6vl+cFTA9DdK6kTWaDWcBrXy0dgUAZAaYYfg1lMOXVk2VBfvt1nhgXeZOT2T+DiO9AgANwAMACzOPoblFi8cQygPiH8nYEMRm7WELcj2Aji2DKLEsT0hQBmmdYMAJH+L4Bg1g1AdGpBhab3kQkyEnZGng8AAXr0e5hKDRgDlIK23YDgBuklI1LqHyZ+yox0NVm4aDFjeHkW/wEBoKxseurucwAAAABJRU5ErkJggg==');
+    width: 16px;
+    height: 16px;
+    vertical-align: middle;
+    display: inline-block;
+  }
+</style>
+
+<table>
+  <tr>
+    <th>Domain</th>
+    <th>Cert ID</th>
+    <th>Expiry</th>
+    <th>Issuer</th>
+  </tr>
+
+  {% for domain in domains %}
+    <tr>
+      {% if not domain.CertID %}
+        <td>{{ domain.DomainID }}</td>
+        <td colspan="3">(none)</td>
+      {% else %}
+        <td><div class="secure"></div> {{ domain.DomainID }}</td>
+        <td>{{ domain.CertID }}</td>
+        <td>{{ domain.CertExpiry|date:"2 January 2006" }}</td>
+        <td>{{ domain.CertIssuer }}</td>
+      {% endif %}
+    </tr>
+  {% endfor %}
+</table>
