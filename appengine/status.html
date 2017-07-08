@@ -33,12 +33,13 @@ body table {
   <tr><th>Date registered</th><td>{{ account.Created|date:"2 January 2006" }}</td></tr>
 </table>
 
-<h1>Certificates</h1>
+<h1>Domains</h1>
 
 <table class="table table-condensed table-hover table-bordered">
   <tr>
     <th>Domain</th>
     <th>Cert ID</th>
+    <th>Issue</th>
     <th>Expiry</th>
     <th>Issuer</th>
     <th></th>
@@ -46,32 +47,64 @@ body table {
 
   {% for domain in domains %}
     <tr>
-      {% if not domain.CertID %}
-        <td>{{ domain.DomainID }}</td>
-        <td colspan="3">(none)</td>
+      {% if not domain.Cert %}
+        <td>{{ domain.Name }}</td>
+        <td colspan="4">(none)</td>
       {% else %}
-        <td><div class="icon secure"></div> {{ domain.DomainID }}</td>
-        <td>{{ domain.CertID }}</td>
-        <td>{{ domain.CertExpiry|date:"2 January 2006" }}</td>
-        <td>{{ domain.CertIssuer }}</td>
+        <td><div class="icon secure"></div> {{ domain.Name }}</td>
+        <td>{{ domain.Cert.ID }}</td>
+        <td>{{ domain.Cert.Issue|date:"2 January 2006" }}</td>
+        <td>{{ domain.Cert.Expiry|date:"2 January 2006" }}</td>
+        <td>{{ domain.Cert.Issuer }}</td>
       {% endif %}
       <td>
-        {% if domain.CreateOp and domain.CreateOp.Error == "" %}
+        {% if domain.OngoingOperation and domain.OngoingOperation.Error == "" %}
           <img class="icon loading" src="//ssl.gstatic.com/pantheon/images/anim/status-working-28.gif" />
           Working...
         {% else %}
           <form action="/ssl-certificates/create" method="POST">
-            <input type="hidden" name="hostname" value="{{ domain.DomainID }}" />
+            <input type="hidden" name="hostname" value="{{ domain.Name }}" />
             <button class="btn btn-primary btn-xs">Get New Certificate</button>
           </form>
         {% endif %}
       </td>
     </tr>
-    {% if domain.CreateOp and domain.CreateOp.Error != "" %}
+    {% if domain.OngoingOperation and domain.OngoingOperation.Error != "" %}
       <tr class="danger">
-        <td colspan="5"><code>{{ domain.CreateOp.Error }}</code></td>
+        <td colspan="6"><code>{{ domain.OngoingOperation.Error }}</code></td>
       </tr>
     {% endif %}
+  {% endfor %}
+</table>
+
+<h1>Unused certificates</h1>
+
+<table class="table table-condensed table-hover table-bordered">
+  <tr>
+    <th>Display name</th>
+    <th>Domains</th>
+    <th>Cert ID</th>
+    <th>Issue</th>
+    <th>Expiry</th>
+    <th>Issuer</th>
+    <th></th>
+  </tr>
+
+  {% for cert in unusedCerts %}
+    <tr>
+      <td>{{ cert.DisplayName }}</td>
+      <td>{{ cert.DomainNames|join:", " }}</td>
+      <td>{{ cert.ID }}</td>
+      <td>{{ cert.Issue|date:"2 January 2006" }}</td>
+      <td>{{ cert.Expiry|date:"2 January 2006" }}</td>
+      <td>{{ cert.Issuer }}</td>
+      <th>
+        <form action="/ssl-certificates/delete" method="POST">
+          <input type="hidden" name="id" value="{{ cert.ID }}" />
+          <button class="btn btn-danger btn-xs">Delete</button>
+        </form>
+      </th>
+    </tr>
   {% endfor %}
 </table>
 

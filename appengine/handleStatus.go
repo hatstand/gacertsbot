@@ -5,6 +5,8 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net/http"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/davidsansome/parallel"
@@ -31,87 +33,121 @@ func handleStatus(c context.Context, w http.ResponseWriter, r *http.Request) err
 	project := appengine.AppID(c)
 
 	// Lookup everything we need in parallel.
-	var certs []*aeapi.AuthorizedCertificate
-	var domains []*aeapi.DomainMapping
+	certs := map[string]*aeapi.AuthorizedCertificate{}
+	ops := map[string]*CreateOperation{}
+	var domainMappings []*aeapi.DomainMapping
 	var account *RegisteredAccount
-	var ops []*CreateOperation
 	if err := parallel.Parallel(nil, nil, func() error {
 		certsResp, err := apps.AuthorizedCertificates.List(project).Do()
 		if err != nil {
 			return err
 		}
-		certs = certsResp.Certificates
+		for _, cert := range certsResp.Certificates {
+			certs[cert.Id] = cert
+		}
 		return nil
 	}, func() error {
 		domainsResp, err := apps.DomainMappings.List(project).Do()
 		if err != nil {
 			return err
 		}
-		domains = domainsResp.DomainMappings
+		domainMappings = domainsResp.DomainMappings
 		return nil
 	}, func() error {
 		var err error
 		_, account, err = createACMEClient(c)
 		return err
 	}, func() error {
-		var err error
-		ops, err = GetCurrentCreateOperations(c)
-		return err
+		o, err := GetCurrentCreateOperations(c)
+		if err != nil {
+			return err
+		}
+		for _, op := range o {
+			ops[op.HostName] = op
+		}
+		return nil
 	}); err != nil {
 		return err
 	}
 
-	// Match domains and certs.
+	// Match domains and certs and ongoing operations.
 	type domainData struct {
-		DomainID    string
-		CertID      string
-		CertDomains []string
-		CertExpiry  time.Time
-		CertIssuer  string
-		CreateOp    *CreateOperation
+		Name             string
+		Cert             *certInfo
+		OngoingOperation *CreateOperation
 	}
-	var data []domainData
+	var domains []domainData
 
-	for _, domain := range domains {
-		d := domainData{DomainID: domain.Id}
-		if domain.SslSettings == nil {
-			continue
-		}
-		d.CertID = domain.SslSettings.CertificateId
+	usedCertIDs := map[string]struct{}{}
+	for _, domain := range domainMappings {
+		d := domainData{Name: domain.Id}
 
-		// Find a cert with this ID.
-		for _, cert := range certs {
-			if cert.Id != d.CertID {
-				continue
+		// Does this domain have SSL enabled?
+		if domain.SslSettings != nil {
+			certID := domain.SslSettings.CertificateId
+			usedCertIDs[certID] = struct{}{}
+
+			// Find a cert with this ID.
+			if cert, ok := certs[certID]; ok {
+				d.Cert = makeCertInfo(cert)
 			}
-			d.CertDomains = cert.DomainNames
-			d.CertExpiry, _ = time.Parse(expireTimeFormat, cert.ExpireTime)
-
-			// Parse the PEM to get the issuer.  We only need the first block.
-			block, _ := pem.Decode([]byte(cert.CertificateRawData.PublicCertificate))
-			if block != nil {
-				certInfo, err := x509.ParseCertificate(block.Bytes)
-				if err == nil && certInfo != nil {
-					d.CertIssuer = certInfo.Issuer.CommonName
-				}
-			}
-			break
 		}
 
 		// Find an ongoing create operation for this domain.
-		for _, op := range ops {
-			if op.HostName == domain.Id {
-				d.CreateOp = op
-				break
-			}
+		if op, ok := ops[domain.Id]; ok {
+			d.OngoingOperation = op
 		}
 
-		data = append(data, d)
+		domains = append(domains, d)
 	}
 
+	// Find unused certificates.
+	var unusedCerts []*certInfo
+	for id, cert := range certs {
+		if _, ok := usedCertIDs[id]; !ok {
+			unusedCerts = append(unusedCerts, makeCertInfo(cert))
+		}
+	}
+	sort.Slice(unusedCerts, func(i, j int) bool {
+		return strings.Compare(unusedCerts[i].ID, unusedCerts[j].ID) < 0
+	})
+
 	return tplStatus.ExecuteWriter(pongo2.Context{
-		"project": project,
-		"account": account,
-		"domains": data,
+		"project":     project,
+		"account":     account,
+		"domains":     domains,
+		"unusedCerts": unusedCerts,
 	}, w)
+}
+
+type certInfo struct {
+	Name        string
+	ID          string
+	DisplayName string
+	DomainNames []string
+	Expiry      time.Time
+
+	Issuer string
+	Issue  time.Time
+}
+
+func makeCertInfo(raw *aeapi.AuthorizedCertificate) *certInfo {
+	ret := certInfo{
+		Name:        raw.Name,
+		ID:          raw.Id,
+		DisplayName: raw.DisplayName,
+		DomainNames: raw.DomainNames,
+	}
+	ret.Expiry, _ = time.Parse(expireTimeFormat, raw.ExpireTime)
+
+	// Parse the PEM to get the issuer.  We only need the first block.
+	if block, _ := pem.Decode([]byte(raw.CertificateRawData.PublicCertificate)); block != nil {
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err == nil && cert != nil {
+			ret.Issuer = cert.Issuer.CommonName
+			ret.Issue = cert.NotBefore
+		}
+	}
+
+	return &ret
 }
