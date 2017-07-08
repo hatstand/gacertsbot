@@ -12,6 +12,15 @@ import (
 	"google.golang.org/appengine/taskqueue"
 )
 
+const (
+	taskRetryLimit = 5
+)
+
+var (
+	taskMinBackoff = 5 * time.Second
+	taskMaxBackoff = 30 * time.Second
+)
+
 // delayFunc creates and schedules a taskqueue task to run the given function
 // in a few seconds.  It schedules it on the appengine module and instance that
 // is serving the current request.  It configures some sensible retry options.
@@ -30,9 +39,9 @@ func delayFunc(c context.Context, fn *delay.Function, args ...interface{}) error
 
 	// Set some sensible retry options.
 	task.RetryOptions = &taskqueue.RetryOptions{
-		RetryLimit: 10,
-		MinBackoff: 5 * time.Second,
-		MaxBackoff: 30 * time.Second,
+		RetryLimit: taskRetryLimit,
+		MinBackoff: taskMinBackoff,
+		MaxBackoff: taskMaxBackoff,
 	}
 
 	// Schedule the task.

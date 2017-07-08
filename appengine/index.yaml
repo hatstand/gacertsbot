@@ -1,0 +1,6 @@
+indexes:
+- kind: SSLCertificates-CreateOperation
+  properties:
+  - name: MappedCertificateID
+  - name: Accepted
+    direction: desc

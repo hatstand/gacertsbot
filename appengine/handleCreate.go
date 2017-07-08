@@ -10,12 +10,19 @@ import (
 )
 
 func handleCreate(c context.Context, w http.ResponseWriter, r *http.Request) error {
-	client, err := createACMEClient(c)
+	if r.Method != "POST" {
+		return fmt.Errorf("Invalid method %s", r.Method)
+	}
+	hostname := r.FormValue("hostname")
+	if hostname == "" {
+		return fmt.Errorf("Missing hostname parameter")
+	}
+
+	client, _, err := createACMEClient(c)
 	if err != nil {
 		return fmt.Errorf("Failed to create ACME client: %v", err)
 	}
 
-	hostname := r.URL.Host
 	log.Infof(c, "Authorizing %s", hostname)
 	auth, err := client.Authorize(c, hostname)
 	if err != nil {
@@ -36,25 +43,17 @@ func handleCreate(c context.Context, w http.ResponseWriter, r *http.Request) err
 			return fmt.Errorf("Failed to create response to %s: %v", challenge.Token, err)
 		}
 
-		ch := &Challenge{
-			AuthorizationURI: auth.URI,
-			HostName:         hostname,
-			ChallengeType:    challenge.Type,
-			ChallengeURI:     challenge.URI,
-			Token:            challenge.Token,
-			Accepted:         time.Now(),
-			Response:         response,
+		cr := &CreateOperation{
+			HostName:            hostname,
+			AuthorizationURI:    auth.URI,
+			ChallengeURI:        challenge.URI,
+			Token:               challenge.Token,
+			Response:            response,
+			Accepted:            time.Now(),
+			MappedCertificateID: "",
 		}
 		// Record the challenge and response in datastore.
-		if err := (&Challenge{
-			AuthorizationURI: auth.URI,
-			HostName:         hostname,
-			ChallengeType:    challenge.Type,
-			ChallengeURI:     challenge.URI,
-			Token:            challenge.Token,
-			Accepted:         time.Now(),
-			Response:         response,
-		}).Put(c); err != nil {
+		if err := cr.Put(c); err != nil {
 			return fmt.Errorf("Failed to save challenge: %v", err)
 		}
 
@@ -64,10 +63,10 @@ func handleCreate(c context.Context, w http.ResponseWriter, r *http.Request) err
 			// another certificate.
 			// Get the existing one from datastore if we can.
 			log.Infof(c, "Challenge is already valid, getting certificate")
-			if existingCh, err := GetChallenge(c, challenge.Token); err == nil {
-				ch = existingCh
+			if existingCr, err := GetCreateOperation(c, challenge.Token); err == nil {
+				cr = existingCr
 			}
-			return delayFunc(c, issueCertificateFunc, ch)
+			return delayFunc(c, issueCertificateFunc, cr)
 
 		default:
 			// Accept the challenge.
@@ -78,5 +77,6 @@ func handleCreate(c context.Context, w http.ResponseWriter, r *http.Request) err
 		}
 		break
 	}
+	http.Redirect(w, r, "/ssl-certificates/status", http.StatusFound)
 	return nil
 }

@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	challengeKind           = "SSLCertificates-Challenge"
+	createOpKind            = "SSLCertificates-CreateOperation"
 	registeredAccountKind   = "SSLCertificates-RegisteredAccount"
 	registeredAccountIDName = "account"
 )
@@ -17,30 +17,62 @@ type RegisteredAccount struct {
 	Created    time.Time
 	PrivateKey []byte
 	AccountID  string
+	Email      string
 }
 
-type Challenge struct {
-	AuthorizationURI string
-	HostName         string
+type CreateOperation struct {
+	HostName         string // The hostname we're creating a certificate for.
+	AuthorizationURI string // ACME Authorization ID.
+	ChallengeURI     string // ACME Challenge ID.
+	Token            string // Challenge token.
+	Response         string // Challenge response.
 
-	ChallengeType string
-	ChallengeURI  string
-	Token         string
-	Response      string
+	Accepted  time.Time // Time we accepted the challenge.
+	Responded time.Time // Time we responded to the challenge.
+	Issued    time.Time // Time we were issued a certificate.
+	Uploaded  time.Time // Time we upload the certificate to appengine.
+	Mapped    time.Time // Time we made the certificate the default on the domain.
 
-	Accepted  time.Time
-	Responded time.Time
-
-	Error string
+	Error               string
+	MappedCertificateID string
 }
 
-func (ch *Challenge) Put(c context.Context) error {
-	_, err := datastore.Put(c, datastore.NewKey(c, challengeKind, ch.Token, 0, nil), ch)
+func (cr *CreateOperation) Put(c context.Context) error {
+	_, err := datastore.Put(c, datastore.NewKey(c, createOpKind, cr.Token, 0, nil), cr)
 	return err
 }
 
-func GetChallenge(c context.Context, token string) (*Challenge, error) {
-	var ret Challenge
-	err := datastore.Get(c, datastore.NewKey(c, challengeKind, token, 0, nil), &ret)
+func GetCreateOperation(c context.Context, token string) (*CreateOperation, error) {
+	var ret CreateOperation
+	err := datastore.Get(c, datastore.NewKey(c, createOpKind, token, 0, nil), &ret)
 	return &ret, err
+}
+
+func GetCurrentCreateOperations(c context.Context) ([]*CreateOperation, error) {
+	var ret []*CreateOperation
+	it := datastore.NewQuery(createOpKind).
+		Filter("MappedCertificateID=", "").
+		Order("-Accepted").
+		Limit(10).
+		Run(c)
+	for {
+		var cr CreateOperation
+		switch _, err := it.Next(&cr); {
+		case err == datastore.Done:
+			return ret, nil
+		case err != nil:
+			return nil, err
+		default:
+			ret = append(ret, &cr)
+		}
+	}
+}
+
+func SetCreateOperationError(c context.Context, cr *CreateOperation, err error) error {
+	if err == nil {
+		return nil
+	}
+	cr.Error = err.Error()
+	cr.Put(c)
+	return err
 }

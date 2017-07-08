@@ -1,7 +1,6 @@
 package appengine
 
 import (
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -14,19 +13,17 @@ import (
 func handleChallenge(c context.Context, w http.ResponseWriter, r *http.Request) error {
 	token := strings.TrimPrefix(r.URL.Path, challengePathPrefix)
 
-	// Find the challenge in datastore.
-	challenge, err := GetChallenge(c, token)
+	// Find the CreateOperation in datastore.
+	cr, err := GetCreateOperation(c, token)
 	if err != nil {
 		return err
 	}
 
-	log.Infof(c, "Responding to challenge %s with %s", challenge.ChallengeURI, challenge.Response)
-	io.WriteString(w, challenge.Response)
+	log.Infof(c, "Responding to challenge %s with %s", cr.ChallengeURI, cr.Response)
+	io.WriteString(w, cr.Response)
 
-	challenge.Responded = time.Now()
-	if err := challenge.Put(c); err != nil {
-		return fmt.Errorf("Failed to save updated challenge: %v", err)
-	}
+	cr.Responded = time.Now()
+	cr.Put(c)
 
-	return delayFunc(c, issueCertificateFunc, challenge)
+	return delayFunc(c, issueCertificateFunc, cr)
 }

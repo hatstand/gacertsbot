@@ -30,9 +30,11 @@ func handleStatus(c context.Context, w http.ResponseWriter, r *http.Request) err
 	}
 	project := appengine.AppID(c)
 
-	// Lookup authorized certs and mapped domains in parallel.
+	// Lookup everything we need in parallel.
 	var certs []*aeapi.AuthorizedCertificate
 	var domains []*aeapi.DomainMapping
+	var account *RegisteredAccount
+	var ops []*CreateOperation
 	if err := parallel.Parallel(nil, nil, func() error {
 		certsResp, err := apps.AuthorizedCertificates.List(project).Do()
 		if err != nil {
@@ -47,16 +49,26 @@ func handleStatus(c context.Context, w http.ResponseWriter, r *http.Request) err
 		}
 		domains = domainsResp.DomainMappings
 		return nil
+	}, func() error {
+		var err error
+		_, account, err = createACMEClient(c)
+		return err
+	}, func() error {
+		var err error
+		ops, err = GetCurrentCreateOperations(c)
+		return err
 	}); err != nil {
 		return err
 	}
 
+	// Match domains and certs.
 	type domainData struct {
 		DomainID    string
 		CertID      string
 		CertDomains []string
 		CertExpiry  time.Time
 		CertIssuer  string
+		CreateOp    *CreateOperation
 	}
 	var data []domainData
 
@@ -83,13 +95,23 @@ func handleStatus(c context.Context, w http.ResponseWriter, r *http.Request) err
 					d.CertIssuer = certInfo.Issuer.CommonName
 				}
 			}
-			data = append(data, d)
 			break
 		}
+
+		// Find an ongoing create operation for this domain.
+		for _, op := range ops {
+			if op.HostName == domain.Id {
+				d.CreateOp = op
+				break
+			}
+		}
+
+		data = append(data, d)
 	}
 
 	return tplStatus.ExecuteWriter(pongo2.Context{
 		"project": project,
+		"account": account,
 		"domains": data,
 	}, w)
 }

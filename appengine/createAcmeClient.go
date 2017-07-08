@@ -24,7 +24,7 @@ const (
 	certificatePEMType = "CERTIFICATE"
 )
 
-func createACMEClient(c context.Context) (*acme.Client, error) {
+func createACMEClient(c context.Context) (*acme.Client, *RegisteredAccount, error) {
 	// Get the account from Datastore.
 	entityKey := datastore.NewKey(c, registeredAccountKind, registeredAccountIDName, 0, nil)
 	account := RegisteredAccount{}
@@ -34,7 +34,7 @@ func createACMEClient(c context.Context) (*acme.Client, error) {
 		log.Infof(c, "Account not found, creating new private key")
 		key, err := rsa.GenerateKey(rand.Reader, 2048)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to generate ACME RSA private key: %v", err)
+			return nil, nil, fmt.Errorf("Failed to generate ACME RSA private key: %v", err)
 		}
 		account.Created = time.Now()
 		account.PrivateKey = serializeKey(key)
@@ -43,7 +43,7 @@ func createACMEClient(c context.Context) (*acme.Client, error) {
 		log.Infof(c, "Using existing account %s", account.AccountID)
 
 	default:
-		return nil, err
+		return nil, nil, err
 	}
 
 	client := &acme.Client{
@@ -53,24 +53,24 @@ func createACMEClient(c context.Context) (*acme.Client, error) {
 
 	if account.AccountID == "" {
 		// Register with Let's Encrypt.
-		email := user.Current(c).Email
-		log.Infof(c, "Registering new account with email address %s", email)
+		account.Email = user.Current(c).Email
+		log.Infof(c, "Registering new account with email address %s", account.Email)
 		acc, err := client.Register(c, &acme.Account{
-			Contact: []string{fmt.Sprintf("mailto:%s", email)},
+			Contact: []string{fmt.Sprintf("mailto:%s", account.Email)},
 		}, acme.AcceptTOS)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to register: %v", err)
+			return nil, nil, fmt.Errorf("Failed to register: %v", err)
 		}
 
 		// Put it back in datastore.
 		log.Infof(c, "Registered new account %s", acc.URI)
 		account.AccountID = acc.URI
 		if _, err := datastore.Put(c, entityKey, &account); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
-	return client, nil
+	return client, &account, nil
 }
 
 func serializeKey(key *rsa.PrivateKey) []byte {
