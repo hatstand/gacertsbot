@@ -35,29 +35,45 @@ func handleStatus(c context.Context, w http.ResponseWriter, r *http.Request) err
 	// Lookup everything we need in parallel.
 	certs := map[string]*aeapi.AuthorizedCertificate{}
 	ops := map[string]*CreateOperation{}
+	authorizedDomains := map[string]struct{}{}
 	var domainMappings []*aeapi.DomainMapping
 	var account *RegisteredAccount
+
 	if err := parallel.Parallel(nil, nil, func() error {
-		certsResp, err := apps.AuthorizedCertificates.List(project).Do()
+		// Get certificates on this project.
+		resp, err := apps.AuthorizedCertificates.List(project).Do()
 		if err != nil {
 			return err
 		}
-		for _, cert := range certsResp.Certificates {
+		for _, cert := range resp.Certificates {
 			certs[cert.Id] = cert
 		}
 		return nil
 	}, func() error {
-		domainsResp, err := apps.DomainMappings.List(project).Do()
+		// Get domains mapped to this project.
+		resp, err := apps.DomainMappings.List(project).Do()
 		if err != nil {
 			return err
 		}
-		domainMappings = domainsResp.DomainMappings
+		domainMappings = resp.DomainMappings
 		return nil
 	}, func() error {
+		// Get domains this service account is authorized on.
+		resp, err := apps.AuthorizedDomains.List(project).Do()
+		if err != nil {
+			return err
+		}
+		for _, domain := range resp.Domains {
+			authorizedDomains[domain.Id] = struct{}{}
+		}
+		return nil
+	}, func() error {
+		// Get the registered ACME account.
 		var err error
 		_, account, err = createACMEClient(c)
 		return err
 	}, func() error {
+		// Get ongoing operations.
 		o, err := GetCurrentCreateOperations(c)
 		if err != nil {
 			return err
@@ -75,12 +91,16 @@ func handleStatus(c context.Context, w http.ResponseWriter, r *http.Request) err
 		Name             string
 		Cert             *certInfo
 		OngoingOperation *CreateOperation
+		IsAuthorized     bool
 	}
 	var domains []domainData
 
 	usedCertIDs := map[string]struct{}{}
 	for _, domain := range domainMappings {
-		d := domainData{Name: domain.Id}
+		d := domainData{
+			Name:         domain.Id,
+			IsAuthorized: isAuthorizedSubdomain(domain.Id, authorizedDomains),
+		}
 
 		// Does this domain have SSL enabled?
 		if domain.SslSettings != nil {
@@ -120,6 +140,7 @@ func handleStatus(c context.Context, w http.ResponseWriter, r *http.Request) err
 	}, w)
 }
 
+// certInfo is the information about a certificate that we pass to the template.
 type certInfo struct {
 	Name        string
 	ID          string
@@ -150,4 +171,17 @@ func makeCertInfo(raw *aeapi.AuthorizedCertificate) *certInfo {
 	}
 
 	return &ret
+}
+
+func isAuthorizedSubdomain(domain string, authorized map[string]struct{}) bool {
+	for {
+		if _, ok := authorized[domain]; ok {
+			return true
+		}
+		i := strings.Index(domain, ".")
+		if i == -1 {
+			return false
+		}
+		domain = domain[i+1 : len(domain)]
+	}
 }

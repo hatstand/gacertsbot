@@ -58,7 +58,9 @@ body table {
         <td>{{ domain.Cert.Issuer }}</td>
       {% endif %}
       <td>
-        {% if domain.OngoingOperation and domain.OngoingOperation.Error == "" %}
+        {% if not domain.IsAuthorized %}
+          <span class="text-warning">Not authorized</span>
+        {% elif domain.OngoingOperation and domain.OngoingOperation.Error == "" %}
           <img class="icon loading" src="//ssl.gstatic.com/pantheon/images/anim/status-working-28.gif" />
           Working...
         {% else %}
@@ -77,35 +79,37 @@ body table {
   {% endfor %}
 </table>
 
-<h1>Unused certificates</h1>
+{% if unusedCerts %}
+  <h1>Unused certificates</h1>
 
-<table class="table table-condensed table-hover table-bordered">
-  <tr>
-    <th>Display name</th>
-    <th>Domains</th>
-    <th>Cert ID</th>
-    <th>Issue</th>
-    <th>Expiry</th>
-    <th>Issuer</th>
-    <th></th>
-  </tr>
-
-  {% for cert in unusedCerts %}
+  <table class="table table-condensed table-hover table-bordered">
     <tr>
-      <td>{{ cert.DisplayName }}</td>
-      <td>{{ cert.DomainNames|join:", " }}</td>
-      <td>{{ cert.ID }}</td>
-      <td>{{ cert.Issue|date:"2 January 2006" }}</td>
-      <td>{{ cert.Expiry|date:"2 January 2006" }}</td>
-      <td>{{ cert.Issuer }}</td>
-      <th>
-        <form action="/ssl-certificates/delete" method="POST">
-          <input type="hidden" name="id" value="{{ cert.ID }}" />
-          <button class="btn btn-danger btn-xs">Delete</button>
-        </form>
-      </th>
+      <th>Display name</th>
+      <th>Domains</th>
+      <th>Cert ID</th>
+      <th>Issue</th>
+      <th>Expiry</th>
+      <th>Issuer</th>
+      <th></th>
     </tr>
-  {% endfor %}
-</table>
+
+    {% for cert in unusedCerts %}
+      <tr>
+        <td>{{ cert.DisplayName }}</td>
+        <td>{{ cert.DomainNames|join:", " }}</td>
+        <td>{{ cert.ID }}</td>
+        <td>{{ cert.Issue|date:"2 January 2006" }}</td>
+        <td>{{ cert.Expiry|date:"2 January 2006" }}</td>
+        <td>{{ cert.Issuer }}</td>
+        <th>
+          <form action="/ssl-certificates/delete" method="POST">
+            <input type="hidden" name="id" value="{{ cert.ID }}" />
+            <button class="btn btn-danger btn-xs">Delete</button>
+          </form>
+        </th>
+      </tr>
+    {% endfor %}
+  </table>
+{% endif %}
 
 </div>
