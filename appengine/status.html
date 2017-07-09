@@ -85,7 +85,7 @@ p.bg-warning {
     </tr>
     {% if domain.Operation and domain.Operation.Error != "" and domain.Operation.MappedCertificateID == "" %} 
       <tr class="danger">
-        <td colspan="6"><code>{{ domain.Operation.Error }}</code></td>
+        <td colspan="6">{{ domain.Operation.Error }}</td>
       </tr>
     {% endif %}
   {% endfor %}

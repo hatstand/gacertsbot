@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"golang.org/x/net/context"
+	"google.golang.org/appengine/delay"
 	"google.golang.org/appengine/log"
 )
 
@@ -18,6 +19,15 @@ func handleCreate(c context.Context, w http.ResponseWriter, r *http.Request) err
 		return fmt.Errorf("Missing hostname parameter")
 	}
 
+	if err := doCreate(c, hostname); err != nil {
+		return err
+	}
+
+	http.Redirect(w, r, "/ssl-certificates/status", http.StatusFound)
+	return nil
+}
+
+func doCreate(c context.Context, hostname string) error {
 	client, _, err := createACMEClient(c)
 	if err != nil {
 		return fmt.Errorf("Failed to create ACME client: %v", err)
@@ -76,6 +86,7 @@ func handleCreate(c context.Context, w http.ResponseWriter, r *http.Request) err
 		}
 		break
 	}
-	http.Redirect(w, r, "/ssl-certificates/status", http.StatusFound)
 	return nil
 }
+
+var createFunc = delay.Func("create", doCreate)
