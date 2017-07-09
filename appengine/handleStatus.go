@@ -74,24 +74,19 @@ func handleStatus(c context.Context, w http.ResponseWriter, r *http.Request) err
 		return err
 	}, func() error {
 		// Get ongoing operations.
-		o, err := GetCurrentCreateOperations(c)
-		if err != nil {
-			return err
-		}
-		for _, op := range o {
-			ops[op.HostName] = op
-		}
-		return nil
+		var err error
+		ops, err = GetRecentCreateOperations(c)
+		return err
 	}); err != nil {
 		return err
 	}
 
 	// Match domains and certs and ongoing operations.
 	type domainData struct {
-		Name             string
-		Cert             *certInfo
-		OngoingOperation *CreateOperation
-		IsAuthorized     bool
+		Name         string
+		Cert         *certInfo
+		Operation    *CreateOperation
+		IsAuthorized bool
 	}
 	var domains []domainData
 
@@ -119,7 +114,7 @@ func handleStatus(c context.Context, w http.ResponseWriter, r *http.Request) err
 
 		// Find an ongoing create operation for this domain.
 		if op, ok := ops[domain.Id]; ok {
-			d.OngoingOperation = op
+			d.Operation = op
 		}
 
 		domains = append(domains, d)

@@ -68,7 +68,7 @@ p.bg-warning {
             <a href="https://www.google.com/webmasters/verification/details?hl=en-GB&authuser=0&domain={{ domain.Name }}">
               Webmaster Central</a>
           </span>
-        {% elif domain.OngoingOperation and domain.OngoingOperation.Error == "" %}
+        {% elif domain.Operation and not domain.Operation.IsFinished %}
           <img class="icon loading" src="//ssl.gstatic.com/pantheon/images/anim/status-working-28.gif" />
           Working...
         {% else %}
@@ -79,9 +79,9 @@ p.bg-warning {
         {% endif %}
       </td>
     </tr>
-    {% if domain.OngoingOperation and domain.OngoingOperation.Error != "" %}
+    {% if domain.Operation and domain.Operation.Error != "" and domain.Operation.MappedCertificateID == "" %} 
       <tr class="danger">
-        <td colspan="6"><code>{{ domain.OngoingOperation.Error }}</code></td>
+        <td colspan="6"><code>{{ domain.Operation.Error }}</code></td>
       </tr>
     {% endif %}
   {% endfor %}

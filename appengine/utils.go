@@ -17,8 +17,8 @@ const (
 )
 
 var (
-	taskMinBackoff = 5 * time.Second
-	taskMaxBackoff = 30 * time.Second
+	taskMinBackoff = 2 * time.Second
+	taskMaxBackoff = 10 * time.Second
 )
 
 // delayFunc creates and schedules a taskqueue task to run the given function

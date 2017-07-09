@@ -1,17 +1,23 @@
 package appengine
 
 import (
+	"errors"
 	"sort"
+	"strconv"
 	"time"
 
 	"golang.org/x/net/context"
 	"google.golang.org/appengine/datastore"
+	"google.golang.org/appengine/delay"
+	"google.golang.org/appengine/log"
 )
 
 const (
 	createOpKind            = "SSLCertificates-CreateOperation"
 	registeredAccountKind   = "SSLCertificates-RegisteredAccount"
 	registeredAccountIDName = "account"
+
+	taskRetryCountHeader = "X-AppEngine-TaskRetryCount"
 )
 
 type RegisteredAccount struct {
@@ -36,6 +42,7 @@ type CreateOperation struct {
 
 	Error               string
 	MappedCertificateID string
+	IsFinished          bool
 }
 
 func (cr *CreateOperation) Put(c context.Context) error {
@@ -55,29 +62,55 @@ func GetAllCreateOperations(c context.Context) ([]*CreateOperation, error) {
 	return ret, err
 }
 
-// GetCurrentCreateOperations returns all create operations that have an error
-// or are still ongoing.  It deliberately does not use a datastore index.
-func GetCurrentCreateOperations(c context.Context) ([]*CreateOperation, error) {
+// GetRecentCreateOperations returns the most recent create operations for each
+// domain.  It deliberately does not use a datastore index.
+func GetRecentCreateOperations(c context.Context) (map[string]*CreateOperation, error) {
 	all, err := GetAllCreateOperations(c)
 	if err != nil {
 		return nil, err
 	}
-	var ret []*CreateOperation
-	for _, op := range all {
-		if op.MappedCertificateID == "" {
-			ret = append(ret, op)
-		}
-	}
+	// Sort by accepted time, ascending.
+	sort.Slice(all, func(i, j int) bool { return all[i].Accepted.Before(all[j].Accepted) })
 
-	sort.Slice(ret, func(i, j int) bool { return ret[i].Accepted.Before(ret[j].Accepted) })
+	ret := map[string]*CreateOperation{}
+	for _, op := range all {
+		ret[op.HostName] = op
+	}
 	return ret, nil
 }
 
-func SetCreateOperationError(c context.Context, cr *CreateOperation, err error) error {
-	if err == nil {
-		return nil
+var (
+	operationFinished = errors.New("operation finished")
+)
+
+// updateOperation runs the given function and afterwards updates the
+// CreateOperation in datastore.  It sets IsFinished if the function returned
+// operationFinished, or if it returned an error on its last retry.
+func updateOperation(c context.Context, cr *CreateOperation, fn func() error) error {
+	err := fn()
+	switch {
+	case err == operationFinished:
+		cr.IsFinished = true
+		err = nil
+
+	case err != nil:
+		cr.Error = err.Error()
+
+		// Will we be retried again?
+		r := delay.Request(c)
+		retryCount, err := strconv.Atoi(r.Header.Get(taskRetryCountHeader))
+		if err != nil {
+			log.Warningf(c, "Failed to parse %s header %s: %v",
+				taskRetryCountHeader, r.Header.Get(taskRetryCountHeader), err)
+		} else {
+			if retryCount == taskRetryLimit {
+				log.Infof(c, "This was the last retry, marking operation as finished")
+				cr.IsFinished = true
+			} else {
+				log.Infof(c, "This was attempt %d/%d, we should run again", retryCount, taskRetryLimit)
+			}
+		}
 	}
-	cr.Error = err.Error()
 	cr.Put(c)
 	return err
 }

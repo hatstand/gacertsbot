@@ -44,13 +44,12 @@ func handleCreate(c context.Context, w http.ResponseWriter, r *http.Request) err
 		}
 
 		cr := &CreateOperation{
-			HostName:            hostname,
-			AuthorizationURI:    auth.URI,
-			ChallengeURI:        challenge.URI,
-			Token:               challenge.Token,
-			Response:            response,
-			Accepted:            time.Now(),
-			MappedCertificateID: "",
+			HostName:         hostname,
+			AuthorizationURI: auth.URI,
+			ChallengeURI:     challenge.URI,
+			Token:            challenge.Token,
+			Response:         response,
+			Accepted:         time.Now(),
 		}
 		// Record the challenge and response in datastore.
 		if err := cr.Put(c); err != nil {
