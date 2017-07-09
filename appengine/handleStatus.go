@@ -96,10 +96,14 @@ func handleStatus(c context.Context, w http.ResponseWriter, r *http.Request) err
 	var domains []domainData
 
 	usedCertIDs := map[string]struct{}{}
+	var anyNotAuthorized bool
 	for _, domain := range domainMappings {
 		d := domainData{
 			Name:         domain.Id,
 			IsAuthorized: isAuthorizedSubdomain(domain.Id, authorizedDomains),
+		}
+		if !d.IsAuthorized {
+			anyNotAuthorized = true
 		}
 
 		// Does this domain have SSL enabled?
@@ -133,10 +137,11 @@ func handleStatus(c context.Context, w http.ResponseWriter, r *http.Request) err
 	})
 
 	return tplStatus.ExecuteWriter(pongo2.Context{
-		"project":     project,
-		"account":     account,
-		"domains":     domains,
-		"unusedCerts": unusedCerts,
+		"project":          project,
+		"account":          account,
+		"domains":          domains,
+		"unusedCerts":      unusedCerts,
+		"anyNotAuthorized": anyNotAuthorized,
 	}, w)
 }
 

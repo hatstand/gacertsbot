@@ -21,6 +21,10 @@ form {
 body table {
   font-size: 12px;
 }
+p.bg-warning {
+  padding: 0.7em;
+  border-left: 3px solid #8a6d3b;
+}
 </style>
 
 <div class="container">
@@ -49,7 +53,7 @@ body table {
     <tr>
       {% if not domain.Cert %}
         <td>{{ domain.Name }}</td>
-        <td colspan="4">(none)</td>
+        <td colspan="4">No SSL certificate</td>
       {% else %}
         <td><div class="icon secure"></div> {{ domain.Name }}</td>
         <td>{{ domain.Cert.ID }}</td>
@@ -59,7 +63,11 @@ body table {
       {% endif %}
       <td>
         {% if not domain.IsAuthorized %}
-          <span class="text-warning">Not authorized</span>
+          <span class="text-warning">
+            Not authorized.
+            <a href="https://www.google.com/webmasters/verification/details?hl=en-GB&authuser=0&domain={{ domain.Name }}">
+              Webmaster Central</a>
+          </span>
         {% elif domain.OngoingOperation and domain.OngoingOperation.Error == "" %}
           <img class="icon loading" src="//ssl.gstatic.com/pantheon/images/anim/status-working-28.gif" />
           Working...
@@ -78,6 +86,15 @@ body table {
     {% endif %}
   {% endfor %}
 </table>
+
+{% if anyNotAuthorized %}
+<p class="bg-warning">
+  Your App Engine default service account needs to be a verified owner of your
+  domains to upload new SSL certificates.  Click the Webmaster Central links for
+  each domain above and add your default service account to the list of Verified
+  Owners: <code>{{ project }}@appspot.gserviceaccount.com</code>
+</p>
+{% endif %}
 
 {% if unusedCerts %}
   <h1>Unused certificates</h1>

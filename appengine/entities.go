@@ -1,6 +1,7 @@
 package appengine
 
 import (
+	"sort"
 	"time"
 
 	"golang.org/x/net/context"
@@ -48,24 +49,28 @@ func GetCreateOperation(c context.Context, token string) (*CreateOperation, erro
 	return &ret, err
 }
 
-func GetCurrentCreateOperations(c context.Context) ([]*CreateOperation, error) {
+func GetAllCreateOperations(c context.Context) ([]*CreateOperation, error) {
 	var ret []*CreateOperation
-	it := datastore.NewQuery(createOpKind).
-		Filter("MappedCertificateID=", "").
-		Order("-Accepted").
-		Limit(10).
-		Run(c)
-	for {
-		var cr CreateOperation
-		switch _, err := it.Next(&cr); {
-		case err == datastore.Done:
-			return ret, nil
-		case err != nil:
-			return nil, err
-		default:
-			ret = append(ret, &cr)
+	_, err := datastore.NewQuery(createOpKind).GetAll(c, &ret)
+	return ret, err
+}
+
+// GetCurrentCreateOperations returns all create operations that have an error
+// or are still ongoing.  It deliberately does not use a datastore index.
+func GetCurrentCreateOperations(c context.Context) ([]*CreateOperation, error) {
+	all, err := GetAllCreateOperations(c)
+	if err != nil {
+		return nil, err
+	}
+	var ret []*CreateOperation
+	for _, op := range all {
+		if op.MappedCertificateID == "" {
+			ret = append(ret, op)
 		}
 	}
+
+	sort.Slice(ret, func(i, j int) bool { return ret[i].Accepted.Before(ret[j].Accepted) })
+	return ret, nil
 }
 
 func SetCreateOperationError(c context.Context, cr *CreateOperation, err error) error {
