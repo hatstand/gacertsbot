@@ -27,6 +27,12 @@ p.bg-warning {
 }
 </style>
 
+{% if anyInProgress %}
+  <script>
+    setTimeout(function() {window.location.reload();}, 5000);
+  </script>
+{% endif %}
+
 <div class="container">
 
 <h1>Account</h1>
@@ -43,7 +49,6 @@ p.bg-warning {
   <tr>
     <th>Domain</th>
     <th>Cert ID</th>
-    <th>Issue</th>
     <th>Expiry</th>
     <th>Issuer</th>
     <th></th>
@@ -57,7 +62,6 @@ p.bg-warning {
       {% else %}
         <td><div class="icon secure"></div> {{ domain.Name }}</td>
         <td>{{ domain.Cert.ID }}</td>
-        <td>{{ domain.Cert.Issue|date:"2 January 2006" }}</td>
         <td>{{ domain.Cert.Expiry|date:"2 January 2006" }}</td>
         <td>{{ domain.Cert.Issuer }}</td>
       {% endif %}
