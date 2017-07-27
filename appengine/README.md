@@ -12,6 +12,10 @@ This App Engine module automatically keeps the SSL certificates on your App Engi
 1. **Deploy the module to your cloud project.**
 
        appcfg.py update . -A YOUR_PROJECT
+       
+    or
+    
+       gcloud app deploy
         
     This will create a new module called `ssl-certificates` in your App Engine app.
 
@@ -27,6 +31,10 @@ This App Engine module automatically keeps the SSL certificates on your App Engi
    And then deploy it with:
 
        appcfg.py update_dispatch .
+       
+   or
+   
+       gcloud app deploy dispatch.yaml
 
 1. **Enable the Google App Engine API** in your cloud project if it's not enabled
    already.  This allows the module to upload new SSL certificates.
@@ -55,3 +63,7 @@ This App Engine module automatically keeps the SSL certificates on your App Engi
    And then deploy it with:
    
        appcfg.py update_cron .
+       
+   or
+   
+       gcloud app deploy cron.yaml
