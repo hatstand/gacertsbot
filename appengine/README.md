@@ -67,3 +67,7 @@ This App Engine module automatically keeps the SSL certificates on your App Engi
    or
    
        gcloud app deploy cron.yaml
+
+## Troubleshooting
+
+If you are still getting 403 errors after enabling the App Engine Admin API, you may also need to [grant the default service account the *App Engine Admin* IAM role](https://console.cloud.google.com/iam-admin/iam/project).
