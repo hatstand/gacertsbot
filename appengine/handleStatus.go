@@ -31,6 +31,10 @@ func handleStatus(c context.Context, w http.ResponseWriter, r *http.Request) err
 		return fmt.Errorf("Failed to create appengine client: %v", err)
 	}
 	project := appengine.AppID(c)
+	serviceAccount, err := appengine.ServiceAccount(c)
+	if err != nil {
+		return fmt.Errorf("No service account found for project %s: %v", project, err)
+	}
 
 	// Lookup everything we need in parallel.
 	certs := map[string]*aeapi.AuthorizedCertificate{}
@@ -136,10 +140,11 @@ func handleStatus(c context.Context, w http.ResponseWriter, r *http.Request) err
 	})
 
 	return tplStatus.ExecuteWriter(pongo2.Context{
-		"project":     project,
-		"account":     account,
-		"domains":     domains,
-		"unusedCerts": unusedCerts,
+		"project":        project,
+		"serviceAccount": serviceAccount,
+		"account":        account,
+		"domains":        domains,
+		"unusedCerts":    unusedCerts,
 
 		"anyNotAuthorized": anyNotAuthorized,
 		"anyInProgress":    anyInProgress,
