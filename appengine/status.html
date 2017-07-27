@@ -25,6 +25,11 @@ p.bg-warning {
   padding: 0.7em;
   border-left: 3px solid #8a6d3b;
 }
+.subtitle {
+  color: #777;
+  font-style: italic;
+  vertical-align: text-bottom;
+}
 </style>
 
 {% if anyInProgress %}
@@ -101,7 +106,12 @@ p.bg-warning {
 {% endif %}
 
 {% if unusedCerts %}
-  <h1>Unused certificates</h1>
+  <span class="h1">
+    Unused certificates
+  </span>
+  <span class="subtitle">
+    May be in use by other App Engine projects
+  </span>
 
   <table class="table table-condensed table-hover table-bordered">
     <tr>
