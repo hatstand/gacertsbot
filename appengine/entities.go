@@ -15,8 +15,6 @@ const (
 	createOpKind            = "SSLCertificates-CreateOperation"
 	registeredAccountKind   = "SSLCertificates-RegisteredAccount"
 	registeredAccountIDName = "account"
-
-	taskRetryCountHeader = "X-AppEngine-TaskRetryCount"
 )
 
 type RegisteredAccount struct {
