@@ -3,7 +3,6 @@ package appengine
 import (
 	"errors"
 	"sort"
-	"strconv"
 	"time"
 
 	"golang.org/x/net/context"
@@ -97,18 +96,13 @@ func updateOperation(c context.Context, cr *CreateOperation, fn func() error) er
 		cr.Error = err.Error()
 
 		// Will we be retried again?
-		r := delay.Request(c)
-		retryCount, err := strconv.Atoi(r.Header.Get(taskRetryCountHeader))
-		if err != nil {
-			log.Warningf(c, "Failed to parse %s header %s: %v",
-				taskRetryCountHeader, r.Header.Get(taskRetryCountHeader), err)
+		headers := delay.RequestHeaders(c)
+
+		if headers.TaskRetryCount == taskRetryLimit {
+			log.Infof(c, "This was the last retry, marking operation as finished")
+			cr.IsFinished = true
 		} else {
-			if retryCount == taskRetryLimit {
-				log.Infof(c, "This was the last retry, marking operation as finished")
-				cr.IsFinished = true
-			} else {
-				log.Infof(c, "This was attempt %d/%d, we should run again", retryCount, taskRetryLimit)
-			}
+			log.Infof(c, "This was attempt %d/%d, we should run again", headers.TaskRetryCount, taskRetryLimit)
 		}
 	}
 	cr.Put(c)

@@ -1,7 +1,6 @@
 runtime: go
 api_version: go1.8
-module: ssl-certificates
-version: live
+service: ssl-certificates
 
 handlers:
 - url: /ssl-certificates/.*
