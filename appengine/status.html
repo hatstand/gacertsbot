@@ -30,6 +30,10 @@ p.bg-warning {
   font-style: italic;
   vertical-align: text-bottom;
 }
+.unused {
+  margin-bottom: 10px;
+  margin-top: 20px;
+}
 </style>
 
 {% if anyInProgress %}
@@ -106,12 +110,14 @@ p.bg-warning {
 {% endif %}
 
 {% if unusedCerts %}
-  <span class="h1">
-    Unused certificates
-  </span>
-  <span class="subtitle">
-    May be in use by other App Engine projects
-  </span>
+  <div class="unused">
+    <span class="h1">
+      Unused certificates
+    </span>
+    <span class="subtitle">
+      May be in use by other App Engine projects
+    </span>
+  </div>
 
   <table class="table table-condensed table-hover table-bordered">
     <tr>
