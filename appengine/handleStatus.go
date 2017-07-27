@@ -43,7 +43,7 @@ func handleStatus(c context.Context, w http.ResponseWriter, r *http.Request) err
 		// Get certificates on this project.
 		resp, err := apps.AuthorizedCertificates.List(project).Do()
 		if err != nil {
-			return err
+			return fmt.Errorf("AuthorizedCertificates fetch failed: %v", err)
 		}
 		for _, cert := range resp.Certificates {
 			certs[cert.Id] = cert
@@ -53,7 +53,7 @@ func handleStatus(c context.Context, w http.ResponseWriter, r *http.Request) err
 		// Get domains mapped to this project.
 		resp, err := apps.DomainMappings.List(project).Do()
 		if err != nil {
-			return err
+			return fmt.Errorf("DomainMappings fetch failed: %v", err)
 		}
 		domainMappings = resp.DomainMappings
 		return nil
@@ -61,7 +61,7 @@ func handleStatus(c context.Context, w http.ResponseWriter, r *http.Request) err
 		// Get domains this service account is authorized on.
 		resp, err := apps.AuthorizedDomains.List(project).Do()
 		if err != nil {
-			return err
+			return fmt.Errorf("AuthorizedDomains fetch failed: %v", err)
 		}
 		for _, domain := range resp.Domains {
 			authorizedDomains[domain.Id] = struct{}{}
