@@ -8,6 +8,11 @@ This App Engine module automatically keeps the SSL certificates on your App Engi
 
        git clone https://github.com/hatstand/gacertsbot
        cd gacertsbot/appengine
+       
+1. **Fetch the dependencies**
+
+       go get github.com/Masterminds/glide
+       glide install
 
 1. **Deploy the module to your cloud project.**
 
