@@ -5,4 +5,4 @@ go:
 
 install:
   - go get -u github.com/kardianos/govendor
-  - govendor sync
+  - govendor fetch +outside
