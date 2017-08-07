@@ -4,5 +4,5 @@ go:
   - 1.8.x
 
 install:
-  - go get -u github.com/kardianos/govendor
-  - govendor fetch +outside
+  - go get -u github.com/Masterminds/glide
+  - glide install
