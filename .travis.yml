@@ -2,3 +2,7 @@ language: go
 
 go:
   - 1.8.x
+
+install:
+  - go get -u github.com/kardianos/govendor
+  - govendor sync
