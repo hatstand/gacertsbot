@@ -1,5 +1,5 @@
-hash: 25143d10fd8a4a68fcf14bc50f15b7b0ea1e2355e2e662de992d1b17e8467a92
-updated: 2017-08-07T23:29:10.0869533+01:00
+hash: 8f39be42e0576ff5884b1ecc80dcb676008c400a3894756b607eac86e2482348
+updated: 2017-08-15T13:10:09.28706+01:00
 imports:
 - name: cloud.google.com/go
   version: a8d72565bb929f3aac7fef3ea887cc0b0a2381af
@@ -39,9 +39,7 @@ imports:
   - googleapi
   - googleapi/internal/uritemplates
 - name: google.golang.org/appengine
-  version: 3cd84cfbda88e688f897dcf255a9fc0cac6ed74a
-  repo: https://github.com/davidsansome/appengine
-  vcs: git
+  version: d9a072cfa7b9736e44311ef77b3e09d804bfa599
   subpackages:
   - datastore
   - delay

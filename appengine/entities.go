@@ -94,7 +94,7 @@ func updateOperation(c context.Context, cr *CreateOperation, fn func() error) er
 		cr.Error = err.Error()
 
 		// Will we be retried again?
-		headers := delay.RequestHeaders(c)
+		headers, _ := delay.RequestHeaders(c)
 
 		if headers.TaskRetryCount == taskRetryLimit {
 			log.Infof(c, "This was the last retry, marking operation as finished")

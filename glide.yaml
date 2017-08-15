@@ -18,9 +18,6 @@ import:
   subpackages:
   - appengine/v1beta
 - package: google.golang.org/appengine
-  version: delay-request-context
-  vcs: git
-  repo: https://github.com/davidsansome/appengine
   subpackages:
   - datastore
   - delay
