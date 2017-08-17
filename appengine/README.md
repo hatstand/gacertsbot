@@ -6,8 +6,8 @@ This App Engine module automatically keeps the SSL certificates on your App Engi
 
 1. **Check out the code.**
 
-       git clone https://github.com/hatstand/gacertsbot
-       cd gacertsbot/appengine
+       go get github.com/hatstand/gacertsbot/appengine
+       cd ${GOPATH:-~/go}/src/github.com/hatstand/gacertsbot/appengine
 
 1. **Deploy the module to your cloud project.**
 
