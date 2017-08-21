@@ -5,6 +5,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net/http"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -13,6 +14,8 @@ import (
 	"github.com/flosch/pongo2"
 	"golang.org/x/net/context"
 	"google.golang.org/appengine"
+	"google.golang.org/appengine/log"
+	"google.golang.org/appengine/urlfetch"
 
 	aeapi "google.golang.org/api/appengine/v1beta"
 )
@@ -35,6 +38,13 @@ func handleStatus(c context.Context, w http.ResponseWriter, r *http.Request) err
 	if err != nil {
 		return fmt.Errorf("No service account found for project %s: %v", project, err)
 	}
+
+	acmeTest := selfTest(c, r)
+	// The self test starts another request within the same go app. Because
+	// GOMAXPROCS is set to 1 on AppEngine, this causes a deadlock as the url
+	// fetch in this goroutine blocks and the other request never gets
+	// scheduled.
+	runtime.Gosched()
 
 	// Lookup everything we need in parallel.
 	certs := map[string]*aeapi.AuthorizedCertificate{}
@@ -148,6 +158,8 @@ func handleStatus(c context.Context, w http.ResponseWriter, r *http.Request) err
 
 		"anyNotAuthorized": anyNotAuthorized,
 		"anyInProgress":    anyInProgress,
+
+		"acmeTestFailed": acmeTest != nil,
 	}, w)
 }
 
@@ -195,4 +207,21 @@ func isAuthorizedSubdomain(domain string, authorized map[string]struct{}) bool {
 		}
 		domain = domain[i+1 : len(domain)]
 	}
+}
+
+func selfTest(c context.Context, r *http.Request) error {
+	// Self test ACME challenge prefix is correctly mapped to us.
+	url := *r.URL
+	url.Path = selfTestPrefix
+	client := urlfetch.Client(c)
+	resp, err := client.Get(url.String())
+	if err != nil {
+		log.Errorf(c, "Self-test for ACME challenge path failed: %v", err)
+		return fmt.Errorf("Self-test for ACME challenge path failed: %v", err)
+	}
+	if resp.StatusCode != 418 { // I'm a teapot!
+		log.Errorf(c, "Expected self-test response 418 but was: %d", resp.StatusCode)
+		return fmt.Errorf("/.well-known/acme-challenge is not correctly mapped to this app")
+	}
+	return nil
 }

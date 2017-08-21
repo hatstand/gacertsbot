@@ -109,6 +109,13 @@ p.bg-warning {
 </p>
 {% endif %}
 
+{% if acmeTestFailed %}
+<p class="bg-warning">
+  The path <code>/.well-known/acme-challenge/*</code> is not correctly mapped to
+  this app. Make sure your <code>dispatch.yaml</code> is correct.
+</p>
+{% endif %}
+
 {% if unusedCerts %}
   <div class="unused">
     <span class="h1">
