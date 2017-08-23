@@ -87,6 +87,9 @@ func handleStatus(c context.Context, w http.ResponseWriter, r *http.Request) err
 		return err
 	}, func() error {
 		acmeTest = selfTest(c, r)
+		if acmeTest != nil {
+			log.Errorf(c, "Self-test for ACME challenge path failed: %v", err)
+		}
 		return nil
 	}); err != nil {
 		return err
@@ -219,12 +222,10 @@ func selfTest(c context.Context, r *http.Request) error {
 	client := urlfetch.Client(c)
 	resp, err := client.Get(u.String())
 	if err != nil {
-		log.Errorf(c, "Self-test for ACME challenge path failed: %v", err)
 		return fmt.Errorf("Self-test for ACME challenge path failed: %v", err)
 	}
 	if resp.StatusCode != 418 { // I'm a teapot!
-		log.Errorf(c, "Expected self-test response 418 but was: %d", resp.StatusCode)
-		return fmt.Errorf("/.well-known/acme-challenge is not correctly mapped to this app")
+		return fmt.Errorf("Expected self-test resposne 418 but was: %d", resp.StatusCode)
 	}
 	return nil
 }
