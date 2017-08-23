@@ -15,6 +15,14 @@ const (
 	createOpKind            = "SSLCertificates-CreateOperation"
 	registeredAccountKind   = "SSLCertificates-RegisteredAccount"
 	registeredAccountIDName = "account"
+
+	// Operations are usually quicker than this.  If one takes longer don't show
+	// it in the UI any more and let the user start another.
+	createOperationSoftExpiry = time.Minute
+
+	// Delete operations after this time.  Errors won't show up in the UI any
+	// more.
+	createOperationHardExpiry = 24 * time.Hour
 )
 
 type RegisteredAccount struct {
@@ -25,6 +33,9 @@ type RegisteredAccount struct {
 }
 
 type CreateOperation struct {
+	// Key is provided by Get* functions, but ignored otherwise.
+	Key *datastore.Key `datastore:"-"`
+
 	HostName         string // The hostname we're creating a certificate for.
 	AuthorizationURI string // ACME Authorization ID.
 	ChallengeURI     string // ACME Challenge ID.
@@ -47,15 +58,26 @@ func (cr *CreateOperation) Put(c context.Context) error {
 	return err
 }
 
+func (cr *CreateOperation) IsOngoing() bool {
+	return cr != nil && !cr.IsFinished && !time.Now().After(cr.Accepted.Add(createOperationSoftExpiry))
+}
+
 func GetCreateOperation(c context.Context, token string) (*CreateOperation, error) {
 	var ret CreateOperation
-	err := datastore.Get(c, datastore.NewKey(c, createOpKind, token, 0, nil), &ret)
+	ret.Key = datastore.NewKey(c, createOpKind, token, 0, nil)
+	err := datastore.Get(c, ret.Key, &ret)
 	return &ret, err
 }
 
 func GetAllCreateOperations(c context.Context) ([]*CreateOperation, error) {
 	var ret []*CreateOperation
-	_, err := datastore.NewQuery(createOpKind).GetAll(c, &ret)
+	keys, err := datastore.NewQuery(createOpKind).GetAll(c, &ret)
+	if err == nil {
+		for i, key := range keys {
+			ret[i].Key = key
+		}
+	}
+
 	return ret, err
 }
 

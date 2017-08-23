@@ -106,7 +106,7 @@ func handleStatus(c context.Context, w http.ResponseWriter, r *http.Request) err
 
 	usedCertIDs := map[string]struct{}{}
 	var anyNotAuthorized bool
-	var anyInProgress bool
+	var anyOngoing bool
 	for _, domain := range domainMappings {
 		d := domainData{
 			Name:         domain.Id,
@@ -130,8 +130,8 @@ func handleStatus(c context.Context, w http.ResponseWriter, r *http.Request) err
 		// Find an ongoing create operation for this domain.
 		if op, ok := ops[domain.Id]; ok {
 			d.Operation = op
-			if !op.IsFinished {
-				anyInProgress = true
+			if op.IsOngoing() {
+				anyOngoing = true
 			}
 		}
 
@@ -151,13 +151,13 @@ func handleStatus(c context.Context, w http.ResponseWriter, r *http.Request) err
 
 	return tplStatus.ExecuteWriter(pongo2.Context{
 		"project":        project,
-		"serviceAccount": serviceAccount,
 		"account":        account,
 		"domains":        domains,
+		"serviceAccount": serviceAccount,
 		"unusedCerts":    unusedCerts,
 
 		"anyNotAuthorized": anyNotAuthorized,
-		"anyInProgress":    anyInProgress,
+		"anyOngoing":       anyOngoing,
 
 		"acmeTestFailed": acmeTest != nil,
 	}, w)

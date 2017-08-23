@@ -28,6 +28,8 @@ func handleCreate(c context.Context, w http.ResponseWriter, r *http.Request) err
 }
 
 func doCreate(c context.Context, hostname string) error {
+	maybeTriggerAsyncCleanup(c)
+
 	client, _, err := createACMEClient(c)
 	if err != nil {
 		return fmt.Errorf("Failed to create ACME client: %v", err)
