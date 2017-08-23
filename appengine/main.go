@@ -6,6 +6,7 @@ import (
 
 const (
 	challengePathPrefix = "/.well-known/acme-challenge/"
+	selfTestPath        = challengePathPrefix + "self-test"
 )
 
 func init() {
@@ -14,4 +15,5 @@ func init() {
 	http.HandleFunc("/ssl-certificates/delete", wrapHTTPHandler(handleDelete))
 	http.HandleFunc("/ssl-certificates/status", wrapHTTPHandler(handleStatus))
 	http.HandleFunc(challengePathPrefix, wrapHTTPHandler(handleChallenge))
+	http.HandleFunc(selfTestPath, wrapHTTPHandler(handleSelfTest))
 }
