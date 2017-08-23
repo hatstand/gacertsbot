@@ -211,7 +211,7 @@ func isAuthorizedSubdomain(domain string, authorized map[string]struct{}) bool {
 func selfTest(c context.Context, r *http.Request) error {
 	log.Infof(c, "Request URL: %s", r.URL.String())
 	u := &url.URL{
-		Path:   selfTestPrefix,
+		Path:   selfTestPath,
 		Host:   appengine.DefaultVersionHostname(c),
 		Scheme: "http",
 	}
