@@ -5,7 +5,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net/http"
-	"runtime"
+	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -39,19 +39,13 @@ func handleStatus(c context.Context, w http.ResponseWriter, r *http.Request) err
 		return fmt.Errorf("No service account found for project %s: %v", project, err)
 	}
 
-	acmeTest := selfTest(c, r)
-	// The self test starts another request within the same go app. Because
-	// GOMAXPROCS is set to 1 on AppEngine, this causes a deadlock as the url
-	// fetch in this goroutine blocks and the other request never gets
-	// scheduled.
-	runtime.Gosched()
-
 	// Lookup everything we need in parallel.
 	certs := map[string]*aeapi.AuthorizedCertificate{}
 	ops := map[string]*CreateOperation{}
 	authorizedDomains := map[string]struct{}{}
 	var domainMappings []*aeapi.DomainMapping
 	var account *RegisteredAccount
+	var acmeTest error
 
 	if err := parallel.Parallel(nil, nil, func() error {
 		// Get certificates on this project.
@@ -91,6 +85,9 @@ func handleStatus(c context.Context, w http.ResponseWriter, r *http.Request) err
 		var err error
 		ops, err = GetRecentCreateOperations(c)
 		return err
+	}, func() error {
+		acmeTest = selfTest(c, r)
+		return nil
 	}); err != nil {
 		return err
 	}
@@ -209,12 +206,18 @@ func isAuthorizedSubdomain(domain string, authorized map[string]struct{}) bool {
 	}
 }
 
+// selfTest checks that the ACME challenge path (/.well-known/acme-challenge) is
+// actually mapped to this module.
 func selfTest(c context.Context, r *http.Request) error {
-	// Self test ACME challenge prefix is correctly mapped to us.
-	url := *r.URL
-	url.Path = selfTestPrefix
+	log.Infof(c, "Request URL: %s", r.URL.String())
+	u := &url.URL{
+		Path:   selfTestPrefix,
+		Host:   appengine.DefaultVersionHostname(c),
+		Scheme: "http",
+	}
+	log.Infof(c, "New URL: %s", u.String())
 	client := urlfetch.Client(c)
-	resp, err := client.Get(url.String())
+	resp, err := client.Get(u.String())
 	if err != nil {
 		log.Errorf(c, "Self-test for ACME challenge path failed: %v", err)
 		return fmt.Errorf("Self-test for ACME challenge path failed: %v", err)
