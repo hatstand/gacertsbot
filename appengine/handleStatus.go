@@ -88,7 +88,7 @@ func handleStatus(c context.Context, w http.ResponseWriter, r *http.Request) err
 	}, func() error {
 		acmeTest = selfTest(c, r)
 		if acmeTest != nil {
-			log.Errorf(c, "Self-test for ACME challenge path failed: %v", err)
+			log.Errorf(c, "Self-test for ACME challenge path failed: %v", acmeTest)
 		}
 		return nil
 	}); err != nil {
