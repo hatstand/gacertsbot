@@ -36,7 +36,7 @@ p.bg-warning {
 }
 </style>
 
-{% if anyInProgress %}
+{% if anyOngoing %}
   <script>
     setTimeout(function() {window.location.reload();}, 5000);
   </script>
@@ -81,7 +81,7 @@ p.bg-warning {
             <a href="https://www.google.com/webmasters/verification/details?hl=en-GB&authuser=0&domain={{ domain.Name }}">
               Webmaster Central</a>
           </span>
-        {% elif domain.Operation and not domain.Operation.IsFinished %}
+        {% elif domain.Operation and domain.Operation.IsOngoing %}
           <img class="icon loading" src="//ssl.gstatic.com/pantheon/images/anim/status-working-28.gif" />
           Working...
         {% else %}
