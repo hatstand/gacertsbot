@@ -219,7 +219,9 @@ func selfTest(c context.Context, r *http.Request) error {
 		Scheme: "http",
 	}
 	log.Infof(c, "New URL: %s", u.String())
-	client := urlfetch.Client(c)
+	ctx, cancel := context.WithDeadline(c, time.Now().Add(time.Second*30))
+	defer cancel()
+	client := urlfetch.Client(ctx)
 	resp, err := client.Get(u.String())
 	if err != nil {
 		return fmt.Errorf("Self-test for ACME challenge path failed: %v", err)
