@@ -1,11 +1,4 @@
 language: go
 
 go:
-  - 1.8.x
-
-install:
-  - go get -u github.com/Masterminds/glide
-  - glide install
-
-script:
-  - go test $(glide novendor)
+  - 1.11.x
